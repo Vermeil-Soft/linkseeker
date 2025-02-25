@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 
 use crate::{
     data::{FromMiddlemanMsg, ToMiddlemanMsg},
@@ -67,10 +68,10 @@ impl FromMiddlemanMsg {
                 Self::RequestErr { msg: msg? }
             },
             "punchorder" => {
-                let mut remote: Option<String> = None;
+                let mut remote: Option<SocketAddr> = None;
                 let mut connecting: Option<String> = None;
                 process_all_kv(s, |k, v| {
-                    if k == "remote" { remote = Some(v.to_string()); }
+                    if k == "remote" { remote = v.parse::<SocketAddr>().ok(); }
                     if k == "connecting" { connecting = Some(v.to_string()); }
                 })?;
                 Self::PunchOrder { connecting, remote: remote? }
@@ -132,7 +133,8 @@ impl ToMiddlemanMsg {
 
 #[test]
 fn parse_deserialized_from_middleman() {
-    let orig = FromMiddlemanMsg::PunchOrder { connecting: Some(String::from("id:123")), remote: String::from("127.0.0.1:15555") };
+    let remote = "127.0.0.1:15555".parse::<SocketAddr>().unwrap();
+    let orig = FromMiddlemanMsg::PunchOrder { connecting: Some(String::from("id:123")), remote };
     let deser = FromMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 }

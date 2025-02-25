@@ -20,5 +20,5 @@ pub enum FromMiddlemanMsg {
     /// Request to connect to the registered has failed.
     RequestErr { msg: String },
     /// Order the client or host to punch the remote
-    PunchOrder { connecting: Option<String>, remote: String },
+    PunchOrder { connecting: Option<String>, remote: std::net::SocketAddr },
 }

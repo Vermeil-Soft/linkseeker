@@ -28,11 +28,12 @@ impl FromMiddlemanMsg {
         use KeyValueSerializer as KVS;
         let s = match self {
             FromMiddlemanMsg::PunchOrder { connecting, remote } => {
+                let remote = remote.to_string();
                 format!(
                     "{}punchorder{}{}",
                     UDPUNCH_ID,
                     KVS::new("connecting", connecting.as_ref().map(|s| s.as_ref())),
-                    KVS::new("remote", remote.as_ref())
+                    KVS::new("remote", &*remote)
                 )
             },
             FromMiddlemanMsg::RegisterErr { msg } => {

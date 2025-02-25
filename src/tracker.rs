@@ -24,23 +24,31 @@ impl Remote {
 
 struct Request {
     pub (crate) connecting: String,
+    /// socket of connecting part, for answers
+    pub (crate) socket: SocketAddr,
     pub (crate) id: String,
     pub (crate) expiring: Instant,
 }
 
 pub struct PunchTracker {
     pub hosts: HashMap<String, Remote>,
-    pub clients: HashMap<String, Remote>,
     pending_requests: VecDeque<Request>,
 
     outgoing_messages: VecDeque<(Vec<u8>, SocketAddr)>,
 }
 
 impl PunchTracker {
+    pub fn new() -> Self {
+        Self {
+            hosts: Default::default(),
+            pending_requests: Default::default(),
+            outgoing_messages: Default::default()
+        }
+    }
+
     pub fn cleanup(&mut self) {
         let now = Instant::now();
         self.hosts.retain(|_k, remote| !remote.is_expired(now));
-        self.clients.retain(|_k, remote| !remote.is_expired(now));
         self.pending_requests.retain(|req| req.expiring < now);
     }
 
@@ -49,14 +57,17 @@ impl PunchTracker {
         self.outgoing_messages.push_back((bytes, remote));
     }
 
-    fn add_pending_request(&mut self, connecting: String, id: String) {
+    fn add_pending_request(&mut self, connecting: String, remote: SocketAddr, id: String) {
         self.pending_requests.push_back(Request {
-            connecting, id, expiring: Instant::now() + REQUEST_EXPIRE_TIME
+            socket: remote,
+            connecting,
+            id,
+            expiring: Instant::now() + REQUEST_EXPIRE_TIME
         });
     }
 
-    fn has_pending_request(&self, connecting: String, id: String) -> bool {
-        self.pending_requests.iter().any(|req| {
+    fn get_pending_req(&self, connecting: &str, id: String) -> Option<&Request> {
+        self.pending_requests.iter().find(|req| {
             req.connecting == connecting && req.id == id
         })
     }
@@ -87,7 +98,7 @@ impl PunchTracker {
                     return;
                 };
                 let host_socket = host.socket;
-                self.add_pending_request(connecting.clone(), id);
+                self.add_pending_request(connecting.clone(), remote, id);
                 self.send_msg(FromMiddlemanMsg::Request { connecting, pass }, host_socket);
             },
             ToMiddlemanMsg::RequestOk { id, connecting } => {
@@ -98,10 +109,19 @@ impl PunchTracker {
                     // an attack: someone tried to answer for someone else
                     return;
                 }
-                if !self.has_pending_request(connecting, id) {
+                let Some(pending_request) = self.get_pending_req(&connecting, id) else {
                     // request not found, simply ignore
                     return;
-                }
+                };
+
+                let host_socket = host.socket;
+                let client_socket = pending_request.socket;
+                // make them punch
+
+                // make the host punch the connecting
+                self.send_msg(FromMiddlemanMsg::PunchOrder { connecting: Some(connecting), remote: client_socket }, host_socket);
+                // make the connecting punch the host
+                self.send_msg(FromMiddlemanMsg::PunchOrder { connecting: None, remote: host_socket }, client_socket);
             },
             ToMiddlemanMsg::RequestErr { id, connecting, msg } => {
                 let Some(host) = self.hosts.get(&id) else {
@@ -111,11 +131,11 @@ impl PunchTracker {
                     // an attack: someone tried to answer for someone else
                     return;
                 }
-                if !self.has_pending_request(connecting, id) {
+                let Some(pending_request) = self.get_pending_req(&connecting, id) else {
                     // request not found, simply ignore
                     return;
-                }
-                self.send_msg(FromMiddlemanMsg::RequestErr { msg }, host.socket);
+                };
+                self.send_msg(FromMiddlemanMsg::RequestErr { msg }, pending_request.socket);
             }
         }
     }
