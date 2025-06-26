@@ -8,11 +8,15 @@ use udpunch::data::{FromMiddlemanMsg, ToMiddlemanMsg};
 fn punch(socket: &UdpSocket, remote: SocketAddr) {
     let mut buf = [0; 1500];
     let _r = socket.send_to(b"PUNCH", remote);
+    println!("punching...");
     std::thread::sleep(Duration::from_secs(2));
     let _r = socket.send_to(b"PUNCH", remote);
+    println!("punching...");
     std::thread::sleep(Duration::from_secs(2));
     let _r = socket.send_to(b"PUNCH", remote);
+    println!("punching...");
     std::thread::sleep(Duration::from_secs(2));
+    println!("waiting for punch...");
     let Ok((len, recv_remote)) = socket.recv_from(&mut buf) else {
         return;
     };
