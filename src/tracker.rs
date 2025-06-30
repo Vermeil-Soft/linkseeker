@@ -72,40 +72,48 @@ impl PunchTracker {
         })
     }
 
-    pub fn process_incoming(&mut self, bytes: &[u8], remote: SocketAddr) {
+    pub fn process_incoming(&mut self, bytes: &[u8], socket: SocketAddr) {
         let Some(msg) = ToMiddlemanMsg::parse(bytes) else { return };
 
         match msg {
             ToMiddlemanMsg::Register => {
+                if let Some((id, found)) = self.hosts.iter_mut().find(|(_, r)| r.socket == socket) {
+                    // check if remote already exists, if it does refresh existing register
+                    found.expiring = Instant::now() + REGISTER_EXPIRE_TIME;
+                    let id = id.clone();
+                    self.send_msg(FromMiddlemanMsg::RegisterOk { id }, socket);
+                    return;
+                }
+
                 let random_id = rand::rng().sample_iter(Alphanumeric)
                     .take(12)
                     .map(char::from)
                     .collect::<String>();
                 let Entry::Vacant(v) = self.hosts.entry(random_id.clone()) else {
                     /* collision, send an error */
-                    self.send_msg(FromMiddlemanMsg::RegisterErr { msg: format!("id generation collision") }, remote);
+                    self.send_msg(FromMiddlemanMsg::RegisterErr { msg: format!("id generation collision") }, socket);
                     return;
                 };
                 v.insert(Remote {
-                    socket: remote,
+                    socket,
                     expiring: Instant::now() + REGISTER_EXPIRE_TIME,
                 });
-                self.send_msg(FromMiddlemanMsg::RegisterOk { id: random_id }, remote);
+                self.send_msg(FromMiddlemanMsg::RegisterOk { id: random_id }, socket);
             },
             ToMiddlemanMsg::Request { id, connecting, pass } => {
                 let Some(host) = self.hosts.get(&id) else {
-                    self.send_msg(FromMiddlemanMsg::RequestErr { msg: format!("host code does not exist") }, remote);
+                    self.send_msg(FromMiddlemanMsg::RequestErr { msg: format!("host code does not exist") }, socket);
                     return;
                 };
                 let host_socket = host.socket;
-                self.add_pending_request(connecting.clone(), remote, id);
+                self.add_pending_request(connecting.clone(), socket, id);
                 self.send_msg(FromMiddlemanMsg::Request { connecting, pass }, host_socket);
             },
             ToMiddlemanMsg::RequestOk { id, connecting } => {
                 let Some(host) = self.hosts.get(&id) else {
                     return;
                 };
-                if host.socket != remote {
+                if host.socket != socket {
                     // an attack: someone tried to answer for someone else
                     return;
                 }
@@ -127,7 +135,7 @@ impl PunchTracker {
                 let Some(host) = self.hosts.get(&id) else {
                     return;
                 };
-                if host.socket != remote {
+                if host.socket != socket {
                     // an attack: someone tried to answer for someone else
                     return;
                 }
