@@ -27,12 +27,11 @@ impl FromMiddlemanMsg {
     pub fn serialize(&self) -> Vec<u8> {
         use KeyValueSerializer as KVS;
         let s = match self {
-            FromMiddlemanMsg::PunchOrder { connecting, remote } => {
+            FromMiddlemanMsg::PunchOrder { remote } => {
                 let remote = remote.to_string();
                 format!(
-                    "{}punchorder{}{}",
+                    "{}punchorder{}",
                     UDPUNCH_ID,
-                    KVS::new("connecting", connecting.as_ref().map(|s| s.as_ref())),
                     KVS::new("remote", &*remote)
                 )
             },
@@ -48,14 +47,6 @@ impl FromMiddlemanMsg {
                     "{}registerok{}",
                     UDPUNCH_ID,
                     KVS::new("id", id.as_ref())
-                )
-            },
-            FromMiddlemanMsg::Request { connecting, pass } => {
-                format!(
-                    "{}request{}{}",
-                    UDPUNCH_ID,
-                    KVS::new("connecting", connecting.as_ref()),
-                    KVS::new("pass", pass.as_ref().map(|s| s.as_ref()))
                 )
             },
             FromMiddlemanMsg::RequestErr { msg } => {
@@ -80,30 +71,11 @@ impl ToMiddlemanMsg {
                     UDPUNCH_ID,
                 )
             },
-            ToMiddlemanMsg::RequestErr { id, connecting, msg } => {
+            ToMiddlemanMsg::Request { id } => {
                 format!(
-                    "{}requesterr{}{}{}",
+                    "{}request{}",
                     UDPUNCH_ID,
                     KVS::new("id", id.as_ref()),
-                    KVS::new("msg", msg.as_ref()),
-                    KVS::new("connecting", connecting.as_ref()),
-                )
-            },
-            ToMiddlemanMsg::RequestOk { id, connecting } => {
-                format!(
-                    "{}requestok{}{}",
-                    UDPUNCH_ID,
-                    KVS::new("id", id.as_ref()),
-                    KVS::new("connecting", connecting.as_ref()),
-                )
-            },
-            ToMiddlemanMsg::Request { id, connecting, pass } => {
-                format!(
-                    "{}request{}{}{}",
-                    UDPUNCH_ID,
-                    KVS::new("id", id.as_ref()),
-                    KVS::new("connecting", connecting.as_ref()),
-                    KVS::new("pass", pass.as_ref().map(|s| s.as_ref()))
                 )
             }
         };

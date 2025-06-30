@@ -52,12 +52,6 @@ fn host_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
         return false;
     };
     println!("successfully register, have id: {}", id);
-    let Some(FromMiddlemanMsg::Request { connecting, .. }) = recv_msg(socket, listener_ip) else {
-        return false;
-    };
-    send_msg(ToMiddlemanMsg::RequestOk { id, connecting: connecting.clone() }, socket, listener_ip);
-    println!("successfully accepted connecting {}", connecting);
-
     let Some(FromMiddlemanMsg::PunchOrder { remote, .. }) = recv_msg(socket, listener_ip) else {
         return false;
     };
@@ -69,9 +63,7 @@ fn host_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
 fn client_script(socket: &UdpSocket, listener_ip: SocketAddr, conn_id: String) -> bool {
     println!("running client script, connecting to id: {}", conn_id);
 
-    let self_id = format!("clientexample");
-
-    send_msg(ToMiddlemanMsg::Request { id: conn_id.clone(), connecting: self_id, pass: None }, socket, listener_ip);
+    send_msg(ToMiddlemanMsg::Request { id: conn_id.clone() }, socket, listener_ip);
     println!("sent request for id {} to {}", conn_id, listener_ip);
     let Some(FromMiddlemanMsg::PunchOrder { remote, .. }) = recv_msg(socket, listener_ip) else {
         return false;

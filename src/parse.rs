@@ -51,15 +51,6 @@ impl FromMiddlemanMsg {
                 })?;
                 Self::RegisterErr { msg: msg? }
             },
-            "request" => {
-                let mut pass: Option<String> = None;
-                let mut connecting: Option<String> = None;
-                process_all_kv(s, |k, v| {
-                    if k == "pass" { pass = Some(v.to_string()); }
-                    if k == "connecting" { connecting = Some(v.to_string()); }
-                })?;
-                Self::Request { connecting: connecting?, pass }
-            },
             "requesterr" => {
                 let mut msg: Option<String> = None;
                 process_all_kv(s, |k, v| {
@@ -69,12 +60,10 @@ impl FromMiddlemanMsg {
             },
             "punchorder" => {
                 let mut remote: Option<SocketAddr> = None;
-                let mut connecting: Option<String> = None;
                 process_all_kv(s, |k, v| {
                     if k == "remote" { remote = v.parse::<SocketAddr>().ok(); }
-                    if k == "connecting" { connecting = Some(v.to_string()); }
                 })?;
-                Self::PunchOrder { connecting, remote: remote? }
+                Self::PunchOrder { remote: remote? }
             },
             _ => return None,
         };
@@ -103,27 +92,7 @@ impl ToMiddlemanMsg {
                     if k == "connecting" { connecting = Some(v.to_string()); }
                     if k == "id" { id = Some(v.to_string()); }
                 })?;
-                Self::Request { id: id?, connecting: connecting?, pass }
-            },
-            "requestok" => {
-                let mut connecting: Option<String> = None;
-                let mut id: Option<String> = None;
-                process_all_kv(s, |k, v| {
-                    if k == "connecting" { connecting = Some(v.to_string()); }
-                    if k == "id" { id = Some(v.to_string()); }
-                })?;
-                Self::RequestOk { id: id?, connecting: connecting? }
-            },
-            "requesterr" => {
-                let mut id: Option<String> = None;
-                let mut connecting: Option<String> = None;
-                let mut msg: Option<String> = None;
-                process_all_kv(s, |k, v| {
-                    if k == "connecting" { connecting = Some(v.to_string()); }
-                    if k == "msg" { msg = Some(v.to_string()); }
-                    if k == "id" { id = Some(v.to_string()); }
-                })?;
-                Self::RequestErr { id: id?, connecting: connecting?, msg: msg? }
+                Self::Request { id: id? }
             },
             _ => return None,
         };
@@ -134,14 +103,14 @@ impl ToMiddlemanMsg {
 #[test]
 fn parse_deserialized_from_middleman() {
     let remote = "127.0.0.1:15555".parse::<SocketAddr>().unwrap();
-    let orig = FromMiddlemanMsg::PunchOrder { connecting: Some(String::from("id:123")), remote };
+    let orig = FromMiddlemanMsg::PunchOrder { remote };
     let deser = FromMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 }
 
 #[test]
 fn parse_deserialized_to_middleman() {
-    let orig = ToMiddlemanMsg::RequestErr { id: format!("1234"), connecting: format!("id:123"), msg: format!("hello") };
+    let orig = ToMiddlemanMsg::Request { id: format!("1234") };
     let deser = ToMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 }
