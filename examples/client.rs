@@ -1,6 +1,6 @@
 use std::{
-    time::{Instant, Duration},
-    net::{UdpSocket, SocketAddr, IpAddr}
+    net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket},
+    time::{Duration, Instant}
 };
 
 use udpunch::data::{FromMiddlemanMsg, ToMiddlemanMsg};
@@ -60,16 +60,23 @@ fn host_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
     true
 }
 
-fn client_script(socket: &UdpSocket, listener_ip: SocketAddr, conn_id: String) -> bool {
+fn client_script(udp_socket: &UdpSocket, listener_ip: SocketAddr, conn_id: String) -> bool {
     println!("running client script, connecting to id: {}", conn_id);
 
-    send_msg(ToMiddlemanMsg::Request { id: conn_id.clone() }, socket, listener_ip);
+    send_msg(ToMiddlemanMsg::Request { id: conn_id.clone() }, udp_socket, listener_ip);
     println!("sent request for id {} to {}", conn_id, listener_ip);
-    let Some(FromMiddlemanMsg::PunchOrder { remote, .. }) = recv_msg(socket, listener_ip) else {
-        return false;
+    let remote_addr;
+    match recv_msg(udp_socket, listener_ip) {
+        Some(FromMiddlemanMsg::PunchOrder { remote, .. }) => {
+            remote_addr = remote;
+        },
+        e => {
+            eprintln!("unexpected {:?}", e);
+            return false;
+        }
     };
-    println!("got request to punch {}", remote);
-    punch(socket, remote);
+    println!("got request to punch {}", remote_addr);
+    punch(udp_socket, remote_addr);
     true
 }
 
@@ -78,9 +85,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arg1 = args.next();
     let arg2 = args.next();
     let listener_ip = arg1.map_or_else(
-        || "127.0.0.1:61999".parse::<SocketAddr>(),
-        |arg1| arg1.parse::<SocketAddr>()
-    )?;
+        || "127.0.0.1:61999".to_socket_addrs().unwrap().next(),
+        |arg1| arg1.to_socket_addrs().unwrap().next()
+    ).unwrap();
     let conn_id = arg2;
     
     let socket = UdpSocket::bind("0.0.0.0:0")?;
