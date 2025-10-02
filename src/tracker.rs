@@ -22,7 +22,7 @@ impl Remote {
 }
 
 pub struct PunchTracker {
-    pub hosts: HashMap<String, Remote>,
+    pub hosts: HashMap<u32, Remote>,
 
     outgoing_messages: VecDeque<(Vec<u8>, SocketAddr)>,
 }
@@ -58,20 +58,18 @@ impl PunchTracker {
                     return;
                 }
 
-                let random_id = rand::rng().sample_iter(Alphanumeric)
-                    .take(12)
-                    .map(char::from)
-                    .collect::<String>();
-                let Entry::Vacant(v) = self.hosts.entry(random_id.clone()) else {
-                    /* collision, send an error */
-                    self.send_msg(FromMiddlemanMsg::RegisterErr { msg: format!("id generation collision") }, socket);
-                    return;
-                };
-                v.insert(Remote {
-                    socket,
-                    expiring: Instant::now() + REGISTER_EXPIRE_TIME,
-                });
-                self.send_msg(FromMiddlemanMsg::RegisterOk { id: random_id }, socket);
+                'gen_loop: loop {
+                    let random_id: u32 = rand::rng().random();
+                    let Entry::Vacant(v) = self.hosts.entry(random_id) else {
+                        continue 'gen_loop;
+                    };
+                    v.insert(Remote {
+                        socket,
+                        expiring: Instant::now() + REGISTER_EXPIRE_TIME,
+                    });
+                    self.send_msg(FromMiddlemanMsg::RegisterOk { id: random_id }, socket);
+                    break 'gen_loop;
+                }
             },
             ToMiddlemanMsg::Request { id } => {
                 let Some(host) = self.hosts.get(&id) else {

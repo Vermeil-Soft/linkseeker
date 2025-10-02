@@ -38,9 +38,9 @@ impl FromMiddlemanMsg {
         };
         let parsed = match command {
             "registerok" => {
-                let mut id: Option<String> = None;
+                let mut id: Option<u32> = None;
                 process_all_kv(s, |k, v| {
-                    if k == "id" { id = Some(v.to_string()); }
+                    if k == "id" { id = v.parse::<u32>().ok() }
                 })?;
                 Self::RegisterOk { id: id? }
             },
@@ -85,12 +85,12 @@ impl ToMiddlemanMsg {
             },
             "request" => {
                 let mut pass: Option<String> = None;
-                let mut id: Option<String> = None;
+                let mut id: Option<u32> = None;
                 let mut connecting: Option<String> = None;
                 process_all_kv(s, |k, v| {
                     if k == "pass" { pass = Some(v.to_string()); }
                     if k == "connecting" { connecting = Some(v.to_string()); }
-                    if k == "id" { id = Some(v.to_string()); }
+                    if k == "id" { id = v.parse::<u32>().ok() }
                 })?;
                 Self::Request { id: id? }
             },
@@ -110,7 +110,7 @@ fn parse_deserialized_from_middleman() {
 
 #[test]
 fn parse_deserialized_to_middleman() {
-    let orig = ToMiddlemanMsg::Request { id: format!("1234") };
+    let orig = ToMiddlemanMsg::Request { id: 1234 };
     let deser = ToMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 }

@@ -60,10 +60,10 @@ fn host_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
     true
 }
 
-fn client_script(udp_socket: &UdpSocket, listener_ip: SocketAddr, conn_id: String) -> bool {
+fn client_script(udp_socket: &UdpSocket, listener_ip: SocketAddr, conn_id: u32) -> bool {
     println!("running client script, connecting to id: {}", conn_id);
 
-    send_msg(ToMiddlemanMsg::Request { id: conn_id.clone() }, udp_socket, listener_ip);
+    send_msg(ToMiddlemanMsg::Request { id: conn_id }, udp_socket, listener_ip);
     println!("sent request for id {} to {}", conn_id, listener_ip);
     let remote_addr;
     match recv_msg(udp_socket, listener_ip) {
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         || "127.0.0.1:61999".to_socket_addrs().unwrap().next(),
         |arg1| arg1.to_socket_addrs().unwrap().next()
     ).unwrap();
-    let conn_id = arg2;
+    let conn_id = arg2.and_then(|v| v.parse::<u32>().ok());
     
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_nonblocking(false)?;

@@ -43,10 +43,11 @@ impl FromMiddlemanMsg {
                 )
             },
             FromMiddlemanMsg::RegisterOk { id } => {
+                let id_str = format!("{}", id);
                 format!(
                     "{}registerok{}",
                     UDPUNCH_ID,
-                    KVS::new("id", id.as_ref())
+                    KVS::new("id", id_str.as_ref())
                 )
             },
             FromMiddlemanMsg::RequestErr { msg } => {
@@ -72,10 +73,11 @@ impl ToMiddlemanMsg {
                 )
             },
             ToMiddlemanMsg::Request { id } => {
+                let id_str = format!("{}", id);
                 format!(
                     "{}request{}",
                     UDPUNCH_ID,
-                    KVS::new("id", id.as_ref()),
+                    KVS::new("id", id_str.as_ref()),
                 )
             }
         };
