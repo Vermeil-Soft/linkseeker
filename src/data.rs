@@ -1,10 +1,11 @@
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToMiddlemanMsg {
     /// Register to the middleman, should return an id
     Register,
     /// Request to connect to the registered.
     Request { id: u32 },
+    PunchCheck { id: u32 },
+    ProxyTo { remote: std::net::SocketAddr },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,4 +16,6 @@ pub enum FromMiddlemanMsg {
     RequestErr { msg: String },
     /// Order the client or host to punch the remote
     PunchOrder { remote: std::net::SocketAddr },
+    PunchCheckResult { ok: bool },
+    ProxyResult { remote: std::net::SocketAddr, ok: bool },
 }

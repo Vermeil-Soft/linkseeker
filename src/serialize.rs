@@ -56,7 +56,23 @@ impl FromMiddlemanMsg {
                     UDPUNCH_ID,
                     KVS::new("msg", msg.as_ref()),
                 )
-            }
+            },
+            FromMiddlemanMsg::PunchCheckResult { ok } => {
+                format!(
+                    "{}punchcheckr{}",
+                    UDPUNCH_ID,
+                    KVS::new("ok", if *ok { "1" } else { "0" }),
+                )
+            },
+            FromMiddlemanMsg::ProxyResult { remote, ok } => {
+                let remote = remote.to_string();
+                format!(
+                    "{}proxyr{}{}",
+                    UDPUNCH_ID,
+                    KVS::new("remote", &*remote),
+                    KVS::new("ok", if *ok { "1" } else { "0" }),
+                )
+            },
         };
         s.into_bytes()
     }
@@ -78,6 +94,22 @@ impl ToMiddlemanMsg {
                     "{}request{}",
                     UDPUNCH_ID,
                     KVS::new("id", id_str.as_ref()),
+                )
+            }
+            ToMiddlemanMsg::PunchCheck { id } => {
+                let id_str = format!("{}", id);
+                format!(
+                    "{}punchcheck{}",
+                    UDPUNCH_ID,
+                    KVS::new("id", id_str.as_ref()),
+                )
+            },
+            ToMiddlemanMsg::ProxyTo { remote } => {
+                let remote = remote.to_string();
+                format!(
+                    "{}proxy{}",
+                    UDPUNCH_ID,
+                    KVS::new("remote", &*remote)
                 )
             }
         };

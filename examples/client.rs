@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant}
 };
 
-use udpunch::data::{FromMiddlemanMsg, ToMiddlemanMsg};
+use linkseeker::data::{FromMiddlemanMsg, ToMiddlemanMsg};
 
 fn punch(socket: &UdpSocket, remote: SocketAddr) {
     let mut buf = [0; 1500];

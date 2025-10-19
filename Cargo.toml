@@ -1,15 +1,23 @@
 [package]
-name = "udpunch"
+name = "linkseeker"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rand = "0.9"
+rand = { version = "0.9", optional = true }
+env_logger = { version = "0.11", optional = true }
+log = { version = "0.4", optional = true }
+
+[features]
+default = []
+tracker = ["rand", "env_logger", "log"]
 
 [[bin]]
-name = "listener"
-path = "src/bins/listener.rs"
+name = "linkseeker"
+path = "src/bins/linkseeker.rs"
+required-features = ["tracker"]
 
 [[example]]
 name = "client"
 path = "examples/client.rs"
+
