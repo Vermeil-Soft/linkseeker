@@ -139,33 +139,40 @@ impl LinkSeekTracker {
     pub fn run(&mut self) {
         let mut buf = [0; 1500];
         loop {
-            self.process(&mut buf);
-            self.process(&mut buf);
-            self.process(&mut buf);
-            self.process(&mut buf);
-            self.process(&mut buf);
-            self.process(&mut buf);
-            self.process(&mut buf);
-            self.process(&mut buf);
+            let mut processed = false;
+            processed |= self.process(&mut buf);
+            processed |= self.process(&mut buf);
+            processed |= self.process(&mut buf);
+            processed |= self.process(&mut buf);
+            processed |= self.process(&mut buf);
+            processed |= self.process(&mut buf);
+            processed |= self.process(&mut buf);
+            processed |= self.process(&mut buf);
 
             self.cleanup();
-            if self.proxy_list.len() > 0 {
-                std::thread::sleep(std::time::Duration::from_micros(1));
-            } else {
-                std::thread::sleep(std::time::Duration::from_millis(1));
+            if !processed {
+                if self.proxy_list.len() > 0 {
+                    std::thread::sleep(std::time::Duration::from_micros(100));
+                } else {
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
             }
         }
     }
 
-    pub fn process(&mut self, buf: &mut [u8; 1500]) {
+    /// Returns whether or not we processed a message
+    pub fn process(&mut self, buf: &mut [u8; 1500]) -> bool {
+        let mut has_any: bool = false;
         for i in 0..UDP_SOCKET_N {
             match self.udp_sockets[i].recv_from(buf) {
                 Ok((size, socket_addr)) => {
                     self.process_incoming(unsafe { buf.get_unchecked(0..size) }, i, socket_addr);
+                    has_any = true;
                 },
                 _ => { continue }
             }
         }
+        has_any
     }
 
     fn gen_random_rdv_id(&mut self, socket_addr: SocketAddr) -> u32 {

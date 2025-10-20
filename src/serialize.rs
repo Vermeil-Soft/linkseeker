@@ -27,12 +27,12 @@ impl FromMiddlemanMsg {
     pub fn serialize(&self) -> Vec<u8> {
         use KeyValueSerializer as KVS;
         let s = match self {
-            FromMiddlemanMsg::PunchOrder { remote } => {
-                let remote = remote.to_string();
+            FromMiddlemanMsg::RegisterOk { id } => {
+                let id_str = format!("{}", id);
                 format!(
-                    "{}punchorder{}",
+                    "{}registerok{}",
                     UDPUNCH_ID,
-                    KVS::new("remote", &*remote)
+                    KVS::new("id", id_str.as_ref())
                 )
             },
             FromMiddlemanMsg::RegisterErr { msg } => {
@@ -42,19 +42,19 @@ impl FromMiddlemanMsg {
                     KVS::new("msg", msg.as_ref())
                 )
             },
-            FromMiddlemanMsg::RegisterOk { id } => {
-                let id_str = format!("{}", id);
-                format!(
-                    "{}registerok{}",
-                    UDPUNCH_ID,
-                    KVS::new("id", id_str.as_ref())
-                )
-            },
             FromMiddlemanMsg::RequestErr { msg } => {
                 format!(
                     "{}requesterr{}",
                     UDPUNCH_ID,
                     KVS::new("msg", msg.as_ref()),
+                )
+            },
+            FromMiddlemanMsg::PunchOrder { remote } => {
+                let remote = remote.to_string();
+                format!(
+                    "{}punchorder{}",
+                    UDPUNCH_ID,
+                    KVS::new("remote", &*remote)
                 )
             },
             FromMiddlemanMsg::PunchCheckResult { ok } => {

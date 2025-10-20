@@ -43,6 +43,28 @@ fn recv_msg(socket: &UdpSocket, remote: SocketAddr) -> Option<FromMiddlemanMsg> 
     FromMiddlemanMsg::parse(&buf[0..len])
 }
 
+fn ping_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
+    println!("running ping script");
+    let sent_id = 10;
+    send_msg(ToMiddlemanMsg::Ping { id: sent_id }, socket, listener_ip);
+
+    match recv_msg(socket, listener_ip) {
+        Some(FromMiddlemanMsg::Pong { id }) => {
+            if id == sent_id {
+                println!("success!");
+                true
+            } else {
+                eprintln!("received incorrect ping id {}", id);
+                false
+            }
+        },
+        e => {
+            eprintln!("did not receive correct answer for register: {:?}", e);
+            false
+        }
+    }
+}
+
 fn host_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
     println!("running host script");
     send_msg(ToMiddlemanMsg::Register, socket, listener_ip);
@@ -109,5 +131,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     };
+    Ok(())
+}
+
+fn _main2() -> Result<(), Box<dyn std::error::Error>> {
+    let mut args = std::env::args().skip(1);
+    let arg1 = args.next();
+    let listener_ip = arg1.map_or_else(
+        || "127.0.0.1:61999".to_socket_addrs().unwrap().next(),
+        |arg1| arg1.to_socket_addrs().unwrap().next()
+    ).unwrap();
+    
+    let socket = UdpSocket::bind("0.0.0.0:0")?;
+    socket.set_nonblocking(false)?;
+    socket.set_read_timeout(None)?;
+
+    ping_script(&socket, listener_ip);
+
     Ok(())
 }

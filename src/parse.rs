@@ -65,6 +65,29 @@ impl FromMiddlemanMsg {
                 })?;
                 Self::PunchOrder { remote: remote? }
             },
+            "punchcheckr" => {
+                let mut ok: Option<bool> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "ok" { ok = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
+                })?;
+                Self::PunchCheckResult { ok: ok? }
+            },
+            "proxyr" => {
+                let mut ok: Option<bool> = None;
+                let mut remote: Option<SocketAddr> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "remote" { remote = v.parse::<SocketAddr>().ok(); }
+                    if k == "ok" { ok = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
+                })?;
+                Self::ProxyResult { remote: remote? , ok: ok? }
+            },
+            "pong" => {
+                let mut id: Option<u32> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "id" { id = v.parse::<u32>().ok() }
+                })?;
+                Self::Pong { id: id? }
+            },
             _ => return None,
         };
         Some(parsed)
@@ -93,6 +116,27 @@ impl ToMiddlemanMsg {
                     if k == "id" { id = v.parse::<u32>().ok() }
                 })?;
                 Self::Request { id: id? }
+            },
+            "punchcheck" => {
+                let mut id: Option<u32> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "id" { id = v.parse::<u32>().ok() }
+                })?;
+                Self::PunchCheck { id: id? }
+            },
+            "proxy" => {
+                let mut remote: Option<SocketAddr> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "remote" { remote = v.parse::<SocketAddr>().ok(); }
+                })?;
+                Self::ProxyTo { remote: remote? }
+            },
+            "ping" => {
+                let mut id: Option<u32> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "id" { id = v.parse::<u32>().ok() }
+                })?;
+                Self::Ping { id: id? }
             },
             _ => return None,
         };
