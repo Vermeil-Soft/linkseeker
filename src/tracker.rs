@@ -149,7 +149,11 @@ impl LinkSeekTracker {
             self.process(&mut buf);
 
             self.cleanup();
-            std::thread::sleep(std::time::Duration::from_micros(1));
+            if self.proxy_list.len() > 0 {
+                std::thread::sleep(std::time::Duration::from_micros(1));
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
         }
     }
 
