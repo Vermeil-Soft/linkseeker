@@ -6,6 +6,7 @@ pub enum ToMiddlemanMsg {
     Request { id: u32 },
     PunchCheck { id: u32 },
     ProxyTo { remote: std::net::SocketAddr },
+    Ping { id: u32 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,4 +19,5 @@ pub enum FromMiddlemanMsg {
     PunchOrder { remote: std::net::SocketAddr },
     PunchCheckResult { ok: bool },
     ProxyResult { remote: std::net::SocketAddr, ok: bool },
+    Pong { id: u32 },
 }

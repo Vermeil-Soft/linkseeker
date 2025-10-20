@@ -73,6 +73,14 @@ impl FromMiddlemanMsg {
                     KVS::new("ok", if *ok { "1" } else { "0" }),
                 )
             },
+            FromMiddlemanMsg::Pong { id } => {
+                let id_str = format!("{}", id);
+                format!(
+                    "{}pong{}",
+                    UDPUNCH_ID,
+                    KVS::new("id", id_str.as_ref())
+                )
+            },
         };
         s.into_bytes()
     }
@@ -111,7 +119,15 @@ impl ToMiddlemanMsg {
                     UDPUNCH_ID,
                     KVS::new("remote", &*remote)
                 )
-            }
+            },
+            ToMiddlemanMsg::Ping { id } => {
+                let id_str = format!("{}", id);
+                format!(
+                    "{}ping{}",
+                    UDPUNCH_ID,
+                    KVS::new("id", id_str.as_ref()),
+                )
+            },
         };
         s.into_bytes()
     }

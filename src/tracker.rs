@@ -265,7 +265,25 @@ impl LinkSeekTracker {
                         (socket_addr, our_socket_n),
                         self.now
                     ));
+                    self.send_msg(
+                        FromMiddlemanMsg::ProxyResult { remote: remote, ok: true },
+                        our_socket_n,
+                        socket_addr
+                    );
+                } else {
+                    self.send_msg(
+                        FromMiddlemanMsg::ProxyResult { remote: remote, ok: false },
+                        our_socket_n,
+                        socket_addr
+                    );
                 }
+            },
+            ToMiddlemanMsg::Ping { id } => {
+                self.send_msg(
+                    FromMiddlemanMsg::Pong { id },
+                    our_socket_n,
+                    socket_addr
+                );
             },
         }
     }
