@@ -149,6 +149,7 @@ impl LinkSeekTracker {
             self.process(&mut buf);
 
             self.cleanup();
+            std::thread::sleep(std::time::Duration::from_micros(1));
         }
     }
 
