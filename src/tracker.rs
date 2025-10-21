@@ -212,7 +212,31 @@ impl LinkSeekTracker {
                 log::info!("registered id {:x} for {}", rdv_id, socket_addr);
                 self.send_msg(FromMiddlemanMsg::RegisterOk { id: rdv_id }, our_socket_n, socket_addr);
             },
-            ToMiddlemanMsg::Request { id } => {
+            ToMiddlemanMsg::Request { id, use_proxy: false } => {
+                let Some(host) = self.rdv_hosts.get(&id) else {
+                    self.send_msg(
+                        FromMiddlemanMsg::RequestErr { msg: format!("host code does not exist") },
+                        our_socket_n,
+                        socket_addr
+                    );
+                    return;
+                };
+                let host_socket = host.socket_addr;
+                log::info!("trying to punch {} <-> {} (id={:x})", host_socket, socket_addr, id);
+                // order server to punch client
+                self.send_msg(
+                    FromMiddlemanMsg::PunchOrder { remote: host_socket },
+                    our_socket_n,
+                    socket_addr
+                );
+                // order client to punch server
+                self.send_msg(
+                    FromMiddlemanMsg::PunchOrder { remote: socket_addr },
+                    our_socket_n,
+                    host_socket
+                );
+            },
+            ToMiddlemanMsg::Request { id, use_proxy: true } => {
                 let Some(host) = self.rdv_hosts.get(&id) else {
                     self.send_msg(
                         FromMiddlemanMsg::RequestErr { msg: format!("host code does not exist") },

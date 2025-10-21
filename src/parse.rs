@@ -65,6 +65,13 @@ impl FromMiddlemanMsg {
                 })?;
                 Self::PunchOrder { remote: remote? }
             },
+            "punchlnksk" => {
+                let mut port: Option<u16> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "port" { port = v.parse::<u16>().ok(); }
+                })?;
+                Self::PunchLinkseeker { port: port? }
+            },
             "punchcheckr" => {
                 let mut ok: Option<bool> = None;
                 process_all_kv(s, |k, v| {
@@ -107,15 +114,13 @@ impl ToMiddlemanMsg {
                 Self::Register
             },
             "request" => {
-                let mut pass: Option<String> = None;
                 let mut id: Option<u32> = None;
-                let mut connecting: Option<String> = None;
+                let mut use_proxy: Option<bool> = None;
                 process_all_kv(s, |k, v| {
-                    if k == "pass" { pass = Some(v.to_string()); }
-                    if k == "connecting" { connecting = Some(v.to_string()); }
                     if k == "id" { id = v.parse::<u32>().ok() }
+                    if k == "use_proxy" { use_proxy = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
                 })?;
-                Self::Request { id: id? }
+                Self::Request { id: id?, use_proxy: use_proxy.unwrap_or(false) }
             },
             "punchcheck" => {
                 let mut id: Option<u32> = None;
@@ -145,6 +150,7 @@ impl ToMiddlemanMsg {
 }
 
 #[test]
+#[cfg(test)]
 fn parse_deserialized_from_middleman() {
     let remote = "127.0.0.1:15555".parse::<SocketAddr>().unwrap();
     let orig = FromMiddlemanMsg::PunchOrder { remote };
@@ -153,8 +159,9 @@ fn parse_deserialized_from_middleman() {
 }
 
 #[test]
+#[cfg(test)]
 fn parse_deserialized_to_middleman() {
-    let orig = ToMiddlemanMsg::Request { id: 1234 };
+    let orig = ToMiddlemanMsg::Request { id: 1234, use_proxy: true };
     let deser = ToMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 }

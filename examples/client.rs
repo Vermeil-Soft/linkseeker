@@ -85,7 +85,7 @@ fn host_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
 fn client_script(udp_socket: &UdpSocket, listener_ip: SocketAddr, conn_id: u32) -> bool {
     println!("running client script, connecting to id: {}", conn_id);
 
-    send_msg(ToMiddlemanMsg::Request { id: conn_id }, udp_socket, listener_ip);
+    send_msg(ToMiddlemanMsg::Request { id: conn_id, use_proxy: false }, udp_socket, listener_ip);
     println!("sent request for id {} to {}", conn_id, listener_ip);
     let remote_addr;
     match recv_msg(udp_socket, listener_ip) {

@@ -57,6 +57,14 @@ impl FromMiddlemanMsg {
                     KVS::new("remote", &*remote)
                 )
             },
+            FromMiddlemanMsg::PunchLinkseeker { port } => {
+                let port = port.to_string();
+                format!(
+                    "{}punchlnksk{}",
+                    UDPUNCH_ID,
+                    KVS::new("port", &*port)
+                )
+            },
             FromMiddlemanMsg::PunchCheckResult { ok } => {
                 format!(
                     "{}punchcheckr{}",
@@ -96,12 +104,13 @@ impl ToMiddlemanMsg {
                     UDPUNCH_ID,
                 )
             },
-            ToMiddlemanMsg::Request { id } => {
+            ToMiddlemanMsg::Request { id, use_proxy } => {
                 let id_str = format!("{}", id);
                 format!(
-                    "{}request{}",
+                    "{}request{}{}",
                     UDPUNCH_ID,
                     KVS::new("id", id_str.as_ref()),
+                    KVS::new("ok", if *use_proxy { "1" } else { "0" }),
                 )
             }
             ToMiddlemanMsg::PunchCheck { id } => {
