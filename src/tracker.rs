@@ -20,7 +20,7 @@ pub struct RdvRemote {
 
 impl RdvRemote {
     fn is_expired(&self, now: Instant) -> bool {
-        self.expiring >= now
+        now >= self.expiring
     }
 }
 
@@ -50,7 +50,7 @@ impl ProxyData {
     }
 
     fn is_expired(&self, now: Instant) -> bool {
-        self.last_active + PROXY_EXPIRE_TIME >= now
+        now >= self.last_active + PROXY_EXPIRE_TIME
     }
 }
 
@@ -70,7 +70,7 @@ impl PunchCheck {
     }
 
     fn is_expired(&self, now: Instant) -> bool {
-        self.expire >= now
+        now >= self.expire
     }
 }
 
