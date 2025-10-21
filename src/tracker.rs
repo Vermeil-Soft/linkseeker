@@ -34,6 +34,7 @@ pub struct ProxyData {
     pub in_packets: u64,
     pub out_packets: u64,
     pub last_active: Instant,
+    pub first_active: Instant,
 }
 
 impl ProxyData {
@@ -45,7 +46,8 @@ impl ProxyData {
             out_socket_n: outgoing.1,
             in_packets: 0,
             out_packets: 0,
-            last_active: now
+            last_active: now,
+            first_active: now,
         }
     }
 
@@ -255,6 +257,9 @@ impl LinkSeekTracker {
                     return;
                 };
                 let host_addr = host.socket_addr;
+                if self.proxy_list.iter().any(|proxy| proxy.incoming == socket_addr && proxy.outgoing == host_addr) {
+                    return;
+                }
                 let Some(host_socket_n) = self.get_next_proxy_socket_n(host_addr) else {
                     log::error!("could not get a new proxy socket for {}: all slots are full", host_addr);
                     return;
@@ -262,12 +267,13 @@ impl LinkSeekTracker {
                 // order host to punch us so they can receive messages
                 self.send_msg(
                     FromMiddlemanMsg::PunchLinkseeker { port: self.start_port + host_socket_n as u16 },
-                    our_socket_n,
-                    socket_addr
+                    0,
+                    host_addr
                 );
+
                 self.proxy_list.push(ProxyData::new(
-                    (host_addr, host_socket_n),
                     (socket_addr, our_socket_n),
+                    (host_addr, host_socket_n),
                     self.now
                 ));
                 log::info!("starting to proxy {} -> ({}:lnksk:{}) -> {} (rdv_id={:8x})",
@@ -338,7 +344,17 @@ impl LinkSeekTracker {
             (p.in_socket_n == our_socket_n && p.incoming == socket_addr)
         );
         if let Some(found) = found {
-            // proxy
+            const DELAY_BEFORE_FIRST_PACKET: Duration = Duration::from_millis(250);
+
+            found.last_active = self.now;
+
+            if self.now < found.first_active + DELAY_BEFORE_FIRST_PACKET {
+                // don't proxy packets too soon
+                // trick to avoid remote router assigning 2 ports to our 2 sockets
+                // the remote server needs to send a packet to us FIRST
+                return;
+            }
+
             if found.incoming == socket_addr {
                 found.in_packets += 1;
                 let _r = self.udp_sockets[found.out_socket_n].send_to(bytes, found.outgoing);
