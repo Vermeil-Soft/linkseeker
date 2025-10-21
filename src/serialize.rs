@@ -110,7 +110,7 @@ impl ToMiddlemanMsg {
                     "{}request{}{}",
                     UDPUNCH_ID,
                     KVS::new("id", id_str.as_ref()),
-                    KVS::new("ok", if *use_proxy { "1" } else { "0" }),
+                    KVS::new("useproxy", if *use_proxy { "1" } else { "0" }),
                 )
             }
             ToMiddlemanMsg::PunchCheck { id } => {

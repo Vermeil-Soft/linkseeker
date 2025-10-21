@@ -118,7 +118,7 @@ impl ToMiddlemanMsg {
                 let mut use_proxy: Option<bool> = None;
                 process_all_kv(s, |k, v| {
                     if k == "id" { id = v.parse::<u32>().ok() }
-                    if k == "use_proxy" { use_proxy = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
+                    if k == "useproxy" { use_proxy = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
                 })?;
                 Self::Request { id: id?, use_proxy: use_proxy.unwrap_or(false) }
             },
