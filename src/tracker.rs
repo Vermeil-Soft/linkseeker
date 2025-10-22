@@ -350,8 +350,9 @@ impl LinkSeekTracker {
 
             if self.now < found.first_active + DELAY_BEFORE_FIRST_PACKET {
                 // don't proxy packets too soon
-                // trick to avoid remote router assigning 2 ports to our 2 sockets
-                // the remote server needs to send a packet to us FIRST
+                // if router's DmZ is active, if we send a packet *before* they send one,
+                // the packet will go through DmZ instead of the remote, and the remote will be invalid
+                // if we wait a bit before sending packets, we ensure that the DmZ does not catch our packet
                 return;
             }
 
