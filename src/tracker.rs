@@ -4,7 +4,7 @@ use rand::{distr::Alphanumeric, Rng};
 
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
-    net::{SocketAddr, UdpSocket},
+    net::{SocketAddr, ToSocketAddrs, UdpSocket},
     time::{Duration, Instant}
 };
 
@@ -327,6 +327,20 @@ impl LinkSeekTracker {
                         socket_addr
                     );
                 }
+            },
+            ToMiddlemanMsg::DomainNameReq { domain } => {
+                let Ok(results) = domain.to_socket_addrs() else {
+                    return;
+                };
+                let mut v = Vec::new();
+                for result in results {
+                    v.push(result);
+                }
+                self.send_msg(
+                    FromMiddlemanMsg::DomainNameResult { domain, results: v },
+                    our_socket_n,
+                    socket_addr
+                );
             },
             ToMiddlemanMsg::Ping { id } => {
                 self.send_msg(

@@ -1,8 +1,7 @@
 use std::net::SocketAddr;
 
 use crate::{
-    data::{FromMiddlemanMsg, ToMiddlemanMsg},
-    common::{UDPUNCH_ID, UDPUNCH_ID_BYTES, UDPUNCH_ID_LEN},
+    common::{UDPUNCH_ID, UDPUNCH_ID_BYTES, UDPUNCH_ID_LEN}, data::{FromMiddlemanMsg, ToMiddlemanMsg}, deser_utils::{SocketAddrCustom, VecCustom}
 };
 
 /// check the head, if it exists return the tail as bytes
@@ -95,6 +94,19 @@ impl FromMiddlemanMsg {
                 })?;
                 Self::Pong { id: id? }
             },
+            "dnr" => {
+                let mut results: Option<VecCustom<SocketAddrCustom>> = None;
+                let mut domain: Option<String> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "results" { results = v.parse().ok() }
+                    if k == "domain" { domain = Some(v.to_string()) }
+                })?;
+                let Some(results) = results else {
+                    return None;
+                };
+                let results = results.0.iter().map(|addr| addr.0).collect::<Vec<_>>();
+                Self::DomainNameResult { domain: domain?, results }
+            },
             _ => return None,
         };
         Some(parsed)
@@ -143,6 +155,13 @@ impl ToMiddlemanMsg {
                 })?;
                 Self::Ping { id: id? }
             },
+            "dnreq" => {
+                let mut domain: Option<String> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "domain" { domain = Some(v.to_string()) }
+                })?;
+                Self::DomainNameReq { domain: domain? }
+            },
             _ => return None,
         };
         Some(parsed)
@@ -154,6 +173,26 @@ impl ToMiddlemanMsg {
 fn parse_deserialized_from_middleman() {
     let remote = "127.0.0.1:15555".parse::<SocketAddr>().unwrap();
     let orig = FromMiddlemanMsg::PunchOrder { remote };
+    let deser = FromMiddlemanMsg::parse(&orig.serialize()).unwrap();
+    assert_eq!(orig, deser);
+}
+
+#[test]
+#[cfg(test)]
+fn parse_deserialized_from_middleman2() {
+    let orig = FromMiddlemanMsg::DomainNameResult { domain: "pote.com".into(), results: vec!["127.0.0.1:15555".parse::<SocketAddr>().unwrap()] };
+    let deser = FromMiddlemanMsg::parse(&orig.serialize()).unwrap();
+    assert_eq!(orig, deser);
+
+    let orig = FromMiddlemanMsg::DomainNameResult { domain: "pote.com".into(), results: vec![] };
+    let orig_ser = &orig.serialize();
+    let deser = FromMiddlemanMsg::parse(orig_ser).unwrap();
+    assert_eq!(orig, deser);
+
+    let orig = FromMiddlemanMsg::DomainNameResult { domain: "pote.com".into(), results: vec![
+        "127.0.0.1:15555".parse::<SocketAddr>().unwrap(),
+        "1.2.3.4:4321".parse::<SocketAddr>().unwrap()
+    ] };
     let deser = FromMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 }

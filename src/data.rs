@@ -7,6 +7,7 @@ pub enum ToMiddlemanMsg {
     PunchCheck { id: u32 },
     ProxyTo { remote: std::net::SocketAddr },
     Ping { id: u32 },
+    DomainNameReq { domain: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,5 +22,6 @@ pub enum FromMiddlemanMsg {
     PunchLinkseeker { port: u16 },
     PunchCheckResult { ok: bool },
     ProxyResult { remote: std::net::SocketAddr, ok: bool },
+    DomainNameResult { domain: String, results: Vec<std::net::SocketAddr> },
     Pong { id: u32 },
 }

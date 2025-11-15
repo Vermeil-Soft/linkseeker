@@ -6,3 +6,5 @@ pub mod common;
 pub mod client;
 #[cfg(feature = "tracker")]
 pub mod tracker;
+
+mod deser_utils;

@@ -81,6 +81,19 @@ impl FromMiddlemanMsg {
                     KVS::new("ok", if *ok { "1" } else { "0" }),
                 )
             },
+            FromMiddlemanMsg::DomainNameResult { domain, results } => {
+                let results = results.iter()
+                    .map(|r| super::deser_utils::SocketAddrCustom(*r))
+                    .collect::<Vec<_>>();
+                let results = super::deser_utils::VecCustom(results);
+                let results_str = format!("{}", results);
+                format!(
+                    "{}dnr{}{}", // stands for domain name resolve, but hide it for great firewall of china...
+                    UDPUNCH_ID,
+                    KVS::new("domain", domain.as_ref()),
+                    KVS::new("results", results_str.as_ref()),
+                )
+            },
             FromMiddlemanMsg::Pong { id } => {
                 let id_str = format!("{}", id);
                 format!(
@@ -137,6 +150,13 @@ impl ToMiddlemanMsg {
                     KVS::new("id", id_str.as_ref()),
                 )
             },
+            ToMiddlemanMsg::DomainNameReq { domain } => {
+                format!(
+                    "{}dnreq{}",
+                    UDPUNCH_ID,
+                    KVS::new("domain", Some(&**domain)),
+                )
+            }
         };
         s.into_bytes()
     }
