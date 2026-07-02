@@ -11,7 +11,7 @@ use std::{
 const REGISTER_EXPIRE_TIME: Duration = Duration::from_secs(60); // 60 seconds
 const PROXY_EXPIRE_TIME: Duration = Duration::from_secs(60); // 60 seconds
 const PUNCH_CHECK_EXPIRE_TIME: Duration = Duration::from_secs(60); // 60 seconds
-const UDP_SOCKET_N: usize = 4;
+const UDP_SOCKET_N: usize = 2;
 
 pub struct RdvRemote {
     pub socket_addr: SocketAddr,
@@ -27,10 +27,10 @@ impl RdvRemote {
 pub struct ProxyData {
     /// socket that asked for a proxy
     pub incoming: SocketAddr,
-    pub in_socket_n: usize,
+    pub socket_n: usize,
+    pub connector_dh_id: [u8; 4],
     /// socket we need to proxy to
     pub outgoing: SocketAddr,
-    pub out_socket_n: usize,
     pub in_packets: u64,
     pub out_packets: u64,
     pub last_active: Instant,
@@ -38,12 +38,12 @@ pub struct ProxyData {
 }
 
 impl ProxyData {
-    fn new(incoming: (SocketAddr, usize), outgoing: (SocketAddr, usize), now: Instant) -> Self {
+    fn new(incoming: (SocketAddr, usize), outgoing: SocketAddr, connector_dh_id: u32, now: Instant) -> Self {
         Self {
             incoming: incoming.0,
-            in_socket_n: incoming.1,
-            outgoing: outgoing.0,
-            out_socket_n: outgoing.1,
+            socket_n: incoming.1,
+            outgoing,
+            connector_dh_id: connector_dh_id.to_be_bytes(),
             in_packets: 0,
             out_packets: 0,
             last_active: now,
@@ -94,17 +94,13 @@ impl LinkSeekTracker {
         // if that's not enough that time is far in the future and a new, smarter me will be able to handle it
         let socket1 = UdpSocket::bind(("0.0.0.0", start_port))?;
         let socket2 = UdpSocket::bind(("0.0.0.0", start_port + 1))?;
-        let socket3 = UdpSocket::bind(("0.0.0.0", start_port + 2))?;
-        let socket4 = UdpSocket::bind(("0.0.0.0", start_port + 3))?;
         socket1.set_nonblocking(true)?;
         socket2.set_nonblocking(true)?;
-        socket3.set_nonblocking(true)?;
-        socket4.set_nonblocking(true)?;
         Ok(Self {
             start_port,
             rdv_hosts: Default::default(),
             proxy_list: Vec::new(),
-            udp_sockets: [socket1, socket2, socket3, socket4],
+            udp_sockets: [socket1, socket2],
             punch_checks: Vec::new(),
             now: Instant::now(),
         })
@@ -199,35 +195,26 @@ impl LinkSeekTracker {
         };
     }
 
-    fn get_next_proxy_socket_n(&self, remote_addr: SocketAddr) -> Option<usize> {
-        // find the first socket we haven't use for that remote
-        let mut our_socket_avail = [true; UDP_SOCKET_N];
-        self.proxy_list.iter()
-            .filter(|p| p.outgoing == remote_addr)
-            .for_each(|p| our_socket_avail[p.out_socket_n] = false);
-        our_socket_avail.iter().enumerate().rev().find_map(|(i, p)| p.then_some(i))
-    }
-
-    pub fn process_linkseeker_msg(&mut self, msg: ToMiddlemanMsg, our_socket_n: usize, socket_addr: SocketAddr) {
+    pub fn process_linkseeker_msg(&mut self, msg: ToMiddlemanMsg, socket_n: usize, socket_addr: SocketAddr) {
         match msg {
             ToMiddlemanMsg::Register => {
                 if let Some((id, found)) = self.rdv_hosts.iter_mut().find(|(_, r)| r.socket_addr == socket_addr) {
                     // check if remote already exists, if it does refresh existing register
                     found.expiring = Instant::now() + REGISTER_EXPIRE_TIME;
                     let id = id.clone();
-                    self.send_msg(FromMiddlemanMsg::RegisterOk { id }, our_socket_n, socket_addr);
+                    self.send_msg(FromMiddlemanMsg::RegisterOk { id }, socket_n, socket_addr);
                     return;
                 }
 
                 let rdv_id = self.gen_random_rdv_id(socket_addr);
                 log::info!("registered id {:x} for {}", rdv_id, socket_addr);
-                self.send_msg(FromMiddlemanMsg::RegisterOk { id: rdv_id }, our_socket_n, socket_addr);
+                self.send_msg(FromMiddlemanMsg::RegisterOk { id: rdv_id }, socket_n, socket_addr);
             },
-            ToMiddlemanMsg::Request { id, use_proxy: false } => {
+            ToMiddlemanMsg::Request { id, use_proxy: false, dh_id: _ } => {
                 let Some(host) = self.rdv_hosts.get(&id) else {
                     self.send_msg(
                         FromMiddlemanMsg::RequestErr { msg: format!("host code does not exist") },
-                        our_socket_n,
+                        socket_n,
                         socket_addr
                     );
                     return;
@@ -237,47 +224,53 @@ impl LinkSeekTracker {
                 // order server to punch client
                 self.send_msg(
                     FromMiddlemanMsg::PunchOrder { remote: host_socket },
-                    our_socket_n,
+                    socket_n,
                     socket_addr
                 );
                 // order client to punch server
                 self.send_msg(
                     FromMiddlemanMsg::PunchOrder { remote: socket_addr },
-                    our_socket_n,
+                    socket_n,
                     host_socket
                 );
             },
-            ToMiddlemanMsg::Request { id, use_proxy: true } => {
+            ToMiddlemanMsg::Request { id, use_proxy: true, dh_id } => {
                 let Some(host) = self.rdv_hosts.get(&id) else {
                     self.send_msg(
                         FromMiddlemanMsg::RequestErr { msg: format!("host code does not exist") },
-                        our_socket_n,
+                        socket_n,
+                        socket_addr
+                    );
+                    return;
+                };
+                let Some(dh_id) = dh_id else {
+                    self.send_msg(
+                        FromMiddlemanMsg::RequestErr { msg: format!("no dh_id given") },
+                        socket_n,
                         socket_addr
                     );
                     return;
                 };
                 let host_addr = host.socket_addr;
                 if self.proxy_list.iter().any(|proxy| proxy.incoming == socket_addr && proxy.outgoing == host_addr) {
+                    // already exists
                     return;
                 }
-                let Some(host_socket_n) = self.get_next_proxy_socket_n(host_addr) else {
-                    log::error!("could not get a new proxy socket for {}: all slots are full", host_addr);
-                    return;
-                };
                 // order host to punch us so they can receive messages
                 self.send_msg(
-                    FromMiddlemanMsg::PunchLinkseeker { port: self.start_port + host_socket_n as u16 },
+                    FromMiddlemanMsg::PunchLinkseeker { port: self.start_port + socket_n as u16 },
                     0,
                     host_addr
                 );
 
                 self.proxy_list.push(ProxyData::new(
-                    (socket_addr, our_socket_n),
-                    (host_addr, host_socket_n),
+                    (socket_addr, socket_n),
+                    host_addr,
+                    dh_id,
                     self.now
                 ));
-                log::info!("starting to proxy {} -> ({}:lnksk:{}) -> {} (rdv_id={:8x})",
-                    socket_addr, our_socket_n, host_socket_n, host_addr, id
+                log::info!("starting to proxy {} -> (lnksk:{}) -> {} (rdv_id={:8x})",
+                    socket_addr, socket_n, host_addr, id
                 );
             },
             ToMiddlemanMsg::PunchCheck { id } => {
@@ -286,7 +279,7 @@ impl LinkSeekTracker {
                 if let Some(found) = found {
                     let first_received = found.first_received;
                     // received a punch check
-                    if first_received.1 != our_socket_n {
+                    if first_received.1 != socket_n {
                         // coming from a different port: check if the socket_addr is different
                         let result = first_received.0 == socket_addr;
                         // addresses are the same from our PoV = udp punching is possible
@@ -294,39 +287,38 @@ impl LinkSeekTracker {
                         log::info!("udp punch check for {} (rdv_id={:8x}): {}", socket_addr, id, result);
 
                         // send the result to remote (both ways).
-                        self.send_msg(FromMiddlemanMsg::PunchCheckResult { ok: result }, our_socket_n, socket_addr);
+                        self.send_msg(FromMiddlemanMsg::PunchCheckResult { ok: result }, socket_n, socket_addr);
                         self.send_msg(FromMiddlemanMsg::PunchCheckResult { ok: result }, first_received.1, first_received.0);
                     } else {
                         // coming from the same port: already received this request, ignore it
                     }
                 } else {
-                    self.punch_checks.push(PunchCheck::new(id, (socket_addr, our_socket_n), self.now));
+                    self.punch_checks.push(PunchCheck::new(id, (socket_addr, socket_n), self.now));
                 }
             },
-            ToMiddlemanMsg::ProxyTo { remote } => {
+            ToMiddlemanMsg::ProxyTo { remote, dh_id } => {
                 // check if the proxy doesn't already exist
-                if self.proxy_list.iter().any(|p| p.outgoing == remote && p.incoming == socket_addr) {
-                    return;
+                if let Some(p) = self.proxy_list.iter().find(|p| p.outgoing == remote && p.incoming == socket_addr) {
+                    if p.connector_dh_id != dh_id.to_be_bytes() {
+                        // we already have a connection, by the new dh_id is different, so reset it...
+                        self.proxy_list.retain(|p| p.outgoing != remote || p.incoming != socket_addr);
+                        log::warn!("starting proxying {} to {} (raw)", socket_addr, remote);
+                    } else {
+                        return;
+                    }
                 }
                 log::info!("starting proxying {} to {} (raw)", socket_addr, remote);
-                if let Some(used_socket_n) = self.get_next_proxy_socket_n(remote) {
-                    self.proxy_list.push(ProxyData::new(
-                        (remote, used_socket_n),
-                        (socket_addr, our_socket_n),
-                        self.now
-                    ));
-                    self.send_msg(
-                        FromMiddlemanMsg::ProxyResult { remote: remote, ok: true },
-                        our_socket_n,
-                        socket_addr
-                    );
-                } else {
-                    self.send_msg(
-                        FromMiddlemanMsg::ProxyResult { remote: remote, ok: false },
-                        our_socket_n,
-                        socket_addr
-                    );
-                }
+                self.proxy_list.push(ProxyData::new(
+                    (remote, socket_n),
+                    socket_addr,
+                    dh_id,
+                    self.now
+                ));
+                self.send_msg(
+                    FromMiddlemanMsg::ProxyResult { remote: remote, ok: true },
+                    socket_n,
+                    socket_addr
+                );
             },
             ToMiddlemanMsg::DomainNameReq { domain } => {
                 let Ok(results) = domain.to_socket_addrs() else {
@@ -338,24 +330,28 @@ impl LinkSeekTracker {
                 }
                 self.send_msg(
                     FromMiddlemanMsg::DomainNameResult { domain, results: v },
-                    our_socket_n,
+                    socket_n,
                     socket_addr
                 );
             },
             ToMiddlemanMsg::Ping { id } => {
                 self.send_msg(
                     FromMiddlemanMsg::Pong { id },
-                    our_socket_n,
+                    socket_n,
                     socket_addr
                 );
             },
         }
     }
 
-    pub fn process_other_msg(&mut self, bytes: &[u8], our_socket_n: usize, socket_addr: SocketAddr) {
+    pub fn process_other_msg(&mut self, bytes: &[u8], socket_n: usize, socket_addr: SocketAddr) {
+        let Some(dst_dh_id_bytes) = bytes.get(8..12) else {
+            return;
+        };
+        let dst_dh_id: &[u8; 4] = dst_dh_id_bytes.as_array().unwrap();
         let found = self.proxy_list.iter_mut().find(|p|
-            (p.out_socket_n == our_socket_n && p.outgoing == socket_addr) ||
-            (p.in_socket_n == our_socket_n && p.incoming == socket_addr)
+            (p.socket_n == socket_n && p.outgoing == socket_addr && p.connector_dh_id == *dst_dh_id) ||
+            (p.socket_n == socket_n && p.incoming == socket_addr)
         );
         if let Some(found) = found {
             const DELAY_BEFORE_FIRST_PACKET: Duration = Duration::from_millis(250);
@@ -372,10 +368,10 @@ impl LinkSeekTracker {
 
             if found.incoming == socket_addr {
                 found.in_packets += 1;
-                let _r = self.udp_sockets[found.out_socket_n].send_to(bytes, found.outgoing);
+                let _r = self.udp_sockets[found.socket_n].send_to(bytes, found.outgoing);
             } else {
                 found.out_packets += 1;
-                let _r = self.udp_sockets[found.in_socket_n].send_to(bytes, found.incoming);
+                let _r = self.udp_sockets[found.socket_n].send_to(bytes, found.incoming);
             }
         }
     }

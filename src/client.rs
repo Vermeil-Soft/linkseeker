@@ -1,6 +1,6 @@
 use std::net::{ToSocketAddrs, SocketAddr, IpAddr, Ipv4Addr, Ipv6Addr};
 
-pub const DEFAULT_LINKSEEKER_PORT: u16 = 61990;
+pub const DEFAULT_LINKSEEKER_PORT: u16 = 61999;
 
 pub fn compute_linkseeker_key(ip_addr: IpAddr) -> u8 {
     let key = match ip_addr {

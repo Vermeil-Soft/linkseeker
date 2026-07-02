@@ -127,12 +127,14 @@ impl ToMiddlemanMsg {
             },
             "request" => {
                 let mut id: Option<u32> = None;
+                let mut dh_id: Option<u32> = None;
                 let mut use_proxy: Option<bool> = None;
                 process_all_kv(s, |k, v| {
                     if k == "id" { id = v.parse::<u32>().ok() }
+                    if k == "dh_id" { dh_id = v.parse::<u32>().ok() }
                     if k == "useproxy" { use_proxy = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
                 })?;
-                Self::Request { id: id?, use_proxy: use_proxy.unwrap_or(false) }
+                Self::Request { id: id?, use_proxy: use_proxy.unwrap_or(false), dh_id }
             },
             "punchcheck" => {
                 let mut id: Option<u32> = None;
@@ -143,10 +145,12 @@ impl ToMiddlemanMsg {
             },
             "proxy" => {
                 let mut remote: Option<SocketAddr> = None;
+                let mut dh_id: Option<u32> = None;
                 process_all_kv(s, |k, v| {
+                    if k == "dh_id" { dh_id = v.parse::<u32>().ok() }
                     if k == "remote" { remote = v.parse::<SocketAddr>().ok(); }
                 })?;
-                Self::ProxyTo { remote: remote? }
+                Self::ProxyTo { remote: remote?, dh_id: dh_id? }
             },
             "ping" => {
                 let mut id: Option<u32> = None;
@@ -200,7 +204,7 @@ fn parse_deserialized_from_middleman2() {
 #[test]
 #[cfg(test)]
 fn parse_deserialized_to_middleman() {
-    let orig = ToMiddlemanMsg::Request { id: 1234, use_proxy: true };
+    let orig = ToMiddlemanMsg::Request { id: 1234, use_proxy: true, dh_id: Some(5) };
     let deser = ToMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 }

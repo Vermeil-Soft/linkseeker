@@ -3,9 +3,14 @@ pub enum ToMiddlemanMsg {
     /// Register to the middleman, should return an id
     Register,
     /// Request to connect to the registered.
-    Request { id: u32, use_proxy: bool },
+    ///
+    /// If use_proxy is true, you must include a dh_id.
+    Request { id: u32, use_proxy: bool, dh_id: Option<u32> },
     PunchCheck { id: u32 },
-    ProxyTo { remote: std::net::SocketAddr },
+    /// Ask to proxy to this specific public address. Only works for rudp v2
+    ///
+    /// DH_ID should be encoded as BigEndian
+    ProxyTo { remote: std::net::SocketAddr, dh_id: u32 },
     Ping { id: u32 },
     DomainNameReq { domain: String },
 }
@@ -21,6 +26,7 @@ pub enum FromMiddlemanMsg {
     /// Order a client to punch THIS server, at port given
     PunchLinkseeker { port: u16 },
     PunchCheckResult { ok: bool },
+    /// Answer whether or not the request has been granted
     ProxyResult { remote: std::net::SocketAddr, ok: bool },
     DomainNameResult { domain: String, results: Vec<std::net::SocketAddr> },
     Pong { id: u32 },

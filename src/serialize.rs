@@ -117,13 +117,15 @@ impl ToMiddlemanMsg {
                     UDPUNCH_ID,
                 )
             },
-            ToMiddlemanMsg::Request { id, use_proxy } => {
+            ToMiddlemanMsg::Request { id, use_proxy, dh_id } => {
                 let id_str = format!("{}", id);
+                let dh_id_str = dh_id.map(|id| format!("{}", id));
                 format!(
-                    "{}request{}{}",
+                    "{}request{}{}{}",
                     UDPUNCH_ID,
                     KVS::new("id", id_str.as_ref()),
                     KVS::new("useproxy", if *use_proxy { "1" } else { "0" }),
+                    KVS::new("dh_id", dh_id_str.as_ref().map(|s| &**s)),
                 )
             }
             ToMiddlemanMsg::PunchCheck { id } => {
@@ -134,12 +136,14 @@ impl ToMiddlemanMsg {
                     KVS::new("id", id_str.as_ref()),
                 )
             },
-            ToMiddlemanMsg::ProxyTo { remote } => {
+            ToMiddlemanMsg::ProxyTo { remote, dh_id } => {
                 let remote = remote.to_string();
+                let id_str = format!("{}", dh_id);
                 format!(
-                    "{}proxy{}",
+                    "{}proxy{}{}",
                     UDPUNCH_ID,
-                    KVS::new("remote", &*remote)
+                    KVS::new("remote", &*remote),
+                    KVS::new("dh_id", id_str.as_ref())
                 )
             },
             ToMiddlemanMsg::Ping { id } => {
