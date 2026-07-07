@@ -49,17 +49,14 @@ This way, we could be able to see whether or not a host is behind a strong NAT, 
 * DomainNameReq(domain): gets all the addresses of a domain address. Useful to bypass some router which change ip
 addresses of some domains
 
-### Server - Client
+### Server -> Client
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FromMiddlemanMsg {
-    RegisterOk(id: u32),
-    RegisterErr(msg: String),
-    RequestErr(msg: String),
-    PunchOrder(remote: ip+port): request the client to punch this specific address of another client.
-    PunchLinkseeker(port: u16): request the client to punch this specific address of ours
-    PunchCheckResult(ok: bool): if yes, the check was a success, you can directly connect to the order address!
-    ProxyResult(remote: ip+port, ok: bool): confirms that proxying is now in-place
-    DomainNameResult(domain: String, results: comma separated(ip+port)),
-    Pong(id: u32),
-}
+* RegisterOk(id: u32),
+* RegisterErr(msg: String),
+* RequestErr(msg: String),
+* PunchOrder(remote: ip+port): request the client to punch this specific address of another client.
+* PunchLinkseeker(port: u16): request the client to punch this specific address of ours
+* PunchCheckResult(ok: bool): if yes, the check was a success, you can directly connect to the order address!
+* ProxyResult(remote: ip+port, ok: bool): confirms that proxying is now in-place
+* DomainNameResult(domain: String, results: comma separated(ip+port)),
+* Pong(id: u32),
