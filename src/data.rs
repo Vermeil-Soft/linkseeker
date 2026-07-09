@@ -13,6 +13,8 @@ pub enum ToMiddlemanMsg {
     ProxyTo { remote: std::net::SocketAddr, dh_id: u32 },
     Ping { id: u32 },
     DomainNameReq { domain: String },
+    /// A request to ensure the connection is kept alive by NATs and such
+    Heartbeat,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,11 +25,14 @@ pub enum FromMiddlemanMsg {
     RequestErr { msg: String },
     /// Order the client or host to punch the remote
     PunchOrder { remote: std::net::SocketAddr },
-    /// Order a client to punch THIS server, at port given
-    PunchLinkseeker { port: u16 },
+    /// The request to connect to id has been accepted. If proxy=true, just send messages to the same address,
+    /// otherwise a PunchOrder is coming.
+    RequestOk { id: u32, use_proxy: bool },
     PunchCheckResult { ok: bool },
     /// Answer whether or not the request has been granted
     ProxyResult { remote: std::net::SocketAddr, ok: bool },
     DomainNameResult { domain: String, results: Vec<std::net::SocketAddr> },
     Pong { id: u32 },
+    /// A request to ensure the connection is kept alive by NATs and such
+    Heartbeat,
 }

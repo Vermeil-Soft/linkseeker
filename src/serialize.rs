@@ -27,6 +27,9 @@ impl FromMiddlemanMsg {
     pub fn serialize(&self) -> Vec<u8> {
         use KeyValueSerializer as KVS;
         let s = match self {
+            FromMiddlemanMsg::Heartbeat => {
+                format!("{}heartbeat", UDPUNCH_ID)
+            },
             FromMiddlemanMsg::RegisterOk { id } => {
                 let id_str = format!("{}", id);
                 format!(
@@ -57,12 +60,13 @@ impl FromMiddlemanMsg {
                     KVS::new("remote", &*remote)
                 )
             },
-            FromMiddlemanMsg::PunchLinkseeker { port } => {
-                let port = port.to_string();
+            FromMiddlemanMsg::RequestOk { id, use_proxy } => {
+                let id = id.to_string();
                 format!(
-                    "{}punchlnksk{}",
+                    "{}punchlnksk{}{}",
                     UDPUNCH_ID,
-                    KVS::new("port", &*port)
+                    KVS::new("id", &*id),
+                    KVS::new("useproxy", if *use_proxy { "1" } else { "0" }),
                 )
             },
             FromMiddlemanMsg::PunchCheckResult { ok } => {
@@ -111,6 +115,9 @@ impl ToMiddlemanMsg {
     pub fn serialize(&self) -> Vec<u8> {
         use KeyValueSerializer as KVS;
         let s = match self {
+            ToMiddlemanMsg::Heartbeat => {
+                format!("{}heartbeat", UDPUNCH_ID)
+            },
             ToMiddlemanMsg::Register => {
                 format!(
                     "{}register",

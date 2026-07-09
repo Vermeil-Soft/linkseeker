@@ -57,19 +57,21 @@ impl FromMiddlemanMsg {
                 })?;
                 Self::RequestErr { msg: msg? }
             },
+            "requestok" => {
+                let mut id: Option<u32> = None;
+                let mut use_proxy: Option<bool> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "id" { id = v.parse::<u32>().ok(); }
+                    if k == "useproxy" { use_proxy = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
+                })?;
+                Self::RequestOk { id: id?, use_proxy: use_proxy? }
+            },
             "punchorder" => {
                 let mut remote: Option<SocketAddr> = None;
                 process_all_kv(s, |k, v| {
                     if k == "remote" { remote = v.parse::<SocketAddr>().ok(); }
                 })?;
                 Self::PunchOrder { remote: remote? }
-            },
-            "punchlnksk" => {
-                let mut port: Option<u16> = None;
-                process_all_kv(s, |k, v| {
-                    if k == "port" { port = v.parse::<u16>().ok(); }
-                })?;
-                Self::PunchLinkseeker { port: port? }
             },
             "punchcheckr" => {
                 let mut ok: Option<bool> = None;

@@ -210,6 +210,7 @@ impl LinkSeekTracker {
                 log::info!("registered id {:x} for {}", rdv_id, socket_addr);
                 self.send_msg(FromMiddlemanMsg::RegisterOk { id: rdv_id }, socket_n, socket_addr);
             },
+            ToMiddlemanMsg::Heartbeat => {},
             ToMiddlemanMsg::Request { id, use_proxy: false, dh_id: _ } => {
                 let Some(host) = self.rdv_hosts.get(&id) else {
                     self.send_msg(
@@ -220,6 +221,13 @@ impl LinkSeekTracker {
                     return;
                 };
                 let host_socket = host.socket_addr;
+
+                // answer favorably to the request
+                self.send_msg(
+                    FromMiddlemanMsg::RequestOk { id, use_proxy: false },
+                    socket_n,
+                    socket_addr
+                );
                 log::info!("trying to punch {} <-> {} (id={:x})", host_socket, socket_addr, id);
                 // order server to punch client
                 self.send_msg(
@@ -256,11 +264,11 @@ impl LinkSeekTracker {
                     // already exists
                     return;
                 }
-                // order host to punch us so they can receive messages
+                // answer favorably to the request
                 self.send_msg(
-                    FromMiddlemanMsg::PunchLinkseeker { port: self.start_port + socket_n as u16 },
-                    0,
-                    host_addr
+                    FromMiddlemanMsg::RequestOk { id, use_proxy: true },
+                    socket_n,
+                    socket_addr
                 );
 
                 self.proxy_list.push(ProxyData::new(
