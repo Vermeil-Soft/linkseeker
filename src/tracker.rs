@@ -175,7 +175,7 @@ impl LinkSeekTracker {
 
     fn gen_random_rdv_id(&mut self, socket_addr: SocketAddr) -> u32 {
         'gen_loop: loop {
-            let random_id: u32 = rand::rng().random();
+            let random_id: u32 = rand::random();
             let Entry::Vacant(v) = self.rdv_hosts.entry(random_id) else {
                 continue 'gen_loop;
             };
