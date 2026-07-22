@@ -36,6 +36,9 @@ impl FromMiddlemanMsg {
             return None;
         };
         let parsed = match command {
+            "heartbeat" => {
+                Self::Heartbeat
+            },
             "registerok" => {
                 let mut id: Option<u32> = None;
                 process_all_kv(s, |k, v| {
@@ -124,8 +127,15 @@ impl ToMiddlemanMsg {
             return None;
         };
         let parsed = match command {
+            "heartbeat" => {
+                Self::Heartbeat
+            },
             "register" => {
-                Self::Register
+                let mut use_proxy: Option<bool> = None;
+                process_all_kv(s, |k, v| {
+                    if k == "useproxy" { use_proxy = if v == "1" { Some(true) } else if v == "0" { Some(false) } else { None }; }
+                })?;
+                Self::Register { use_proxy: use_proxy.unwrap_or(false) }
             },
             "request" => {
                 let mut id: Option<u32> = None;

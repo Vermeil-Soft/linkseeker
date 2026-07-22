@@ -118,9 +118,10 @@ impl ToMiddlemanMsg {
             ToMiddlemanMsg::Heartbeat => {
                 format!("{}heartbeat", UDPUNCH_ID)
             },
-            ToMiddlemanMsg::Register => {
+            ToMiddlemanMsg::Register { use_proxy } => {
                 format!(
-                    "{}register",
+                    "{}register{}",
+                    KVS::new("useproxy", if *use_proxy { "1" } else { "0" }),
                     UDPUNCH_ID,
                 )
             },

@@ -1,7 +1,9 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToMiddlemanMsg {
-    /// Register to the middleman, should return an id
-    Register,
+    /// Register to the middleman, should return an id.
+    ///
+    /// use_proxy means that all remotes connecting will need use a proxy under the hood.
+    Register { use_proxy: bool },
     /// Request to connect to the registered.
     ///
     /// If use_proxy is true, you must include a dh_id.

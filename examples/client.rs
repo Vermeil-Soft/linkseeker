@@ -67,7 +67,7 @@ fn ping_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
 
 fn host_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
     println!("running host script");
-    send_msg(ToMiddlemanMsg::Register, socket, listener_ip);
+    send_msg(ToMiddlemanMsg::Register { use_proxy: false }, socket, listener_ip);
 
     let Some(FromMiddlemanMsg::RegisterOk { id }) = recv_msg(socket, listener_ip) else {
         eprintln!("did not receive correct answer for register");
