@@ -216,7 +216,15 @@ fn parse_deserialized_from_middleman2() {
 #[test]
 #[cfg(test)]
 fn parse_deserialized_to_middleman() {
-    let orig = ToMiddlemanMsg::Request { id: 1234, use_proxy: true, dh_id: Some(5) };
-    let deser = ToMiddlemanMsg::parse(&orig.serialize()).unwrap();
-    assert_eq!(orig, deser);
+    let msgs = vec![
+        ToMiddlemanMsg::Request { id: 1234, use_proxy: true, dh_id: Some(5) },
+        ToMiddlemanMsg::Register { use_proxy: true },
+        ToMiddlemanMsg::Ping { id: 99 },
+        ToMiddlemanMsg::ProxyTo { remote: "127.0.0.1:15555".parse::<SocketAddr>().unwrap(), dh_id: 999 },
+        ToMiddlemanMsg::Heartbeat
+    ];
+    for msg in msgs {
+        let deser = ToMiddlemanMsg::parse(&msg.serialize());
+        assert!(Some(msg.clone()) == deser, "{:?} != {:?}", Some(msg), deser);
+    }
 }

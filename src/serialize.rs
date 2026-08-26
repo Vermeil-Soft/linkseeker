@@ -121,8 +121,8 @@ impl ToMiddlemanMsg {
             ToMiddlemanMsg::Register { use_proxy } => {
                 format!(
                     "{}register{}",
-                    KVS::new("useproxy", if *use_proxy { "1" } else { "0" }),
                     UDPUNCH_ID,
+                    KVS::new("useproxy", if *use_proxy { "1" } else { "0" }),
                 )
             },
             ToMiddlemanMsg::Request { id, use_proxy, dh_id } => {
