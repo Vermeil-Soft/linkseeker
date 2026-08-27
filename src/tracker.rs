@@ -190,7 +190,7 @@ impl LinkSeekTracker {
     }
 
     pub fn process_incoming(&mut self, bytes: &[u8], our_socket_n: usize, socket_addr: SocketAddr) {
-        match dbg!(ToMiddlemanMsg::parse(bytes)) {
+        match ToMiddlemanMsg::parse(bytes) {
             Some(msg) => self.process_linkseeker_msg(msg, our_socket_n, socket_addr),
             None => self.process_other_msg(bytes, our_socket_n, socket_addr),
         };
