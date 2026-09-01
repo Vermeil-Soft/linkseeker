@@ -82,6 +82,7 @@ pub struct LinkSeekTracker {
     #[allow(unused)]
     pub (self) start_port: u16,
     pub (self) now: Instant,
+    pub (self) last_log: Instant,
     pub rdv_hosts: HashMap<u32, RdvRemote>,
     pub punch_checks: Vec<PunchCheck>,
     pub udp_sockets: [UdpSocket; UDP_SOCKET_N],
@@ -96,13 +97,15 @@ impl LinkSeekTracker {
         let socket2 = UdpSocket::bind(("0.0.0.0", start_port + 1))?;
         socket1.set_nonblocking(true)?;
         socket2.set_nonblocking(true)?;
+        let now = Instant::now();
         Ok(Self {
             start_port,
             rdv_hosts: Default::default(),
             proxy_list: Vec::new(),
             udp_sockets: [socket1, socket2],
             punch_checks: Vec::new(),
-            now: Instant::now(),
+            now,
+            last_log: now
         })
     }
 
@@ -127,6 +130,24 @@ impl LinkSeekTracker {
         });
     }
 
+    /// Every X minutes, tries to log the current tracker status. Should be called regularly.
+    pub fn try_log_status(&mut self) {
+        const LOG_INTERVAL: Duration = Duration::from_mins(10);
+        let diff = self.now.saturating_duration_since(self.last_log);
+        if diff < LOG_INTERVAL {
+            return;
+        }
+        self.last_log = self.now;
+
+        if self.rdv_hosts.len() == 0 && self.proxy_list.len() == 0 {
+            log::info!("status: no hosts or proxies registered");
+        } else {
+            log::info!("status: currently {} hosts registered, and proxying {} connections",
+                self.rdv_hosts.len(), self.proxy_list.len()
+            );
+        }
+    }
+
     pub fn send_msg(&mut self, msg: FromMiddlemanMsg, our_socket_n: usize, remote: SocketAddr) {
         let bytes = msg.serialize();
         // send each message twice just to be sure
@@ -146,8 +167,8 @@ impl LinkSeekTracker {
             processed |= self.process(&mut buf);
             processed |= self.process(&mut buf);
             processed |= self.process(&mut buf);
-
             self.cleanup();
+            self.try_log_status();
             if !processed {
                 if self.proxy_list.len() > 0 {
                     std::thread::sleep(std::time::Duration::from_micros(100));

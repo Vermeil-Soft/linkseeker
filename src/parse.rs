@@ -200,6 +200,10 @@ fn parse_deserialized_from_middleman2() {
     let deser = FromMiddlemanMsg::parse(&orig.serialize()).unwrap();
     assert_eq!(orig, deser);
 
+    let orig = FromMiddlemanMsg::RequestOk { id: 1, use_proxy: true };
+    let deser = FromMiddlemanMsg::parse(&orig.serialize()).unwrap();
+    assert_eq!(orig, deser);
+
     let orig = FromMiddlemanMsg::DomainNameResult { domain: "pote.com".into(), results: vec![] };
     let orig_ser = &orig.serialize();
     let deser = FromMiddlemanMsg::parse(orig_ser).unwrap();

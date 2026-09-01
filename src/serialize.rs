@@ -63,7 +63,7 @@ impl FromMiddlemanMsg {
             FromMiddlemanMsg::RequestOk { id, use_proxy } => {
                 let id = id.to_string();
                 format!(
-                    "{}punchlnksk{}{}",
+                    "{}requestok{}{}",
                     UDPUNCH_ID,
                     KVS::new("id", &*id),
                     KVS::new("useproxy", if *use_proxy { "1" } else { "0" }),
