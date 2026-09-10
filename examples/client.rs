@@ -43,7 +43,7 @@ fn recv_msg(socket: &UdpSocket, remote: SocketAddr) -> Option<FromMiddlemanMsg> 
     FromMiddlemanMsg::parse(&buf[0..len])
 }
 
-fn ping_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
+fn _ping_script(socket: &UdpSocket, listener_ip: SocketAddr) -> bool {
     println!("running ping script");
     let sent_id = 10;
     send_msg(ToMiddlemanMsg::Ping { id: sent_id }, socket, listener_ip);
@@ -146,7 +146,7 @@ fn _main2() -> Result<(), Box<dyn std::error::Error>> {
     socket.set_nonblocking(false)?;
     socket.set_read_timeout(None)?;
 
-    ping_script(&socket, listener_ip);
+    _ping_script(&socket, listener_ip);
 
     Ok(())
 }
