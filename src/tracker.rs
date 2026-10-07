@@ -1,9 +1,7 @@
 use crate::data::{FromMiddlemanMsg, ToMiddlemanMsg};
 
-use rand::{distr::Alphanumeric, Rng};
-
 use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
+    collections::{hash_map::Entry, HashMap},
     net::{SocketAddr, ToSocketAddrs, UdpSocket},
     time::{Duration, Instant}
 };
@@ -217,14 +215,15 @@ impl LinkSeekTracker {
         };
     }
 
-    fn start_proxy(&mut self, rdv_id: u32, (socket_n, socket_addr): (usize, SocketAddr), dh_id: Option<u32>, client_need_proxy: bool) {
+    /// return true if new proxy was created, false if already created OR could not create
+    fn start_proxy(&mut self, rdv_id: u32, (socket_n, socket_addr): (usize, SocketAddr), dh_id: Option<u32>, client_need_proxy: bool) -> bool {
         let Some(host) = self.rdv_hosts.get(&rdv_id) else {
             self.send_msg(
                 FromMiddlemanMsg::RequestErr { msg: format!("host code does not exist") },
                 socket_n,
                 socket_addr
             );
-            return;
+            return false;
         };
         let Some(dh_id) = dh_id else {
             self.send_msg(
@@ -232,13 +231,13 @@ impl LinkSeekTracker {
                 socket_n,
                 socket_addr
             );
-            return;
+            return false;
         };
         let host_addr = host.socket_addr;
         let host_always_proxy = host.always_proxy;
         if self.proxy_list.iter().any(|proxy| proxy.incoming == socket_addr && proxy.outgoing == host_addr) {
             // already exists
-            return;
+            return false;
         }
         // answer favorably to the request
         self.send_msg(
@@ -256,6 +255,7 @@ impl LinkSeekTracker {
         log::info!("starting to proxy {} -> (lnksk:{}) -> {} (rdv_id={:8x}); server_need_proxy={}, client_need_proxy={}",
             socket_addr, socket_n, host_addr, rdv_id, host_always_proxy, client_need_proxy
         );
+        true
     }
 
     pub fn process_linkseeker_msg(&mut self, msg: ToMiddlemanMsg, our_socket_n: usize, socket_addr: SocketAddr) {
@@ -295,8 +295,10 @@ impl LinkSeekTracker {
                     // part of the same network. odds are, they probably can't talk to each other through
                     // the public network through punching, so let's proxy them through us instead.
 
-                    log::info!("connector and host (rdv_id={:8x}) share same ip {}, start proxy", id, host_socket);
-                    self.start_proxy(id, (our_socket_n, socket_addr), dh_id, false);
+                    let success = self.start_proxy(id, (our_socket_n, socket_addr), dh_id, false);
+                    if success {
+                        log::info!("connector and host (rdv_id={:8x}) share same ip {}, started proxy", id, host_socket);
+                    }
                     return;
                 }
 
