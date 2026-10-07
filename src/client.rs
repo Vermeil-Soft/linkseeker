@@ -1,4 +1,4 @@
-use std::net::{ToSocketAddrs, SocketAddr, IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{ToSocketAddrs, SocketAddr, IpAddr};
 
 pub const DEFAULT_LINKSEEKER_PORT: u16 = 61998;
 

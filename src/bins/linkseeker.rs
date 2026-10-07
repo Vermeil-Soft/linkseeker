@@ -1,8 +1,3 @@
-use std::{
-    time::{Instant, Duration},
-    net::{UdpSocket, SocketAddr, IpAddr}
-};
-
 use linkseeker::tracker::LinkSeekTracker;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use crate::{
-    common::{UDPUNCH_ID, UDPUNCH_ID_BYTES, UDPUNCH_ID_LEN}, data::{FromMiddlemanMsg, ToMiddlemanMsg}, deser_utils::{SocketAddrCustom, VecCustom}
+    common::{UDPUNCH_ID_BYTES, UDPUNCH_ID_LEN}, data::{FromMiddlemanMsg, ToMiddlemanMsg}, deser_utils::{SocketAddrCustom, VecCustom}
 };
 
 /// check the head, if it exists return the tail as bytes
