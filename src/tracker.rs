@@ -287,27 +287,38 @@ impl LinkSeekTracker {
 
                 if host.always_proxy {
                     self.start_proxy(id, (our_socket_n, socket_addr), dh_id, false);
-                } else {
-                    // answer favorably to the request, without proxy needed
-                    self.send_msg(
-                        FromMiddlemanMsg::RequestOk { id, use_proxy: false },
-                        our_socket_n,
-                        socket_addr
-                    );
-                    log::info!("trying to punch {} <-> {} (id={:x})", host_socket, socket_addr, id);
-                    // order server to punch client
-                    self.send_msg(
-                        FromMiddlemanMsg::PunchOrder { remote: host_socket },
-                        our_socket_n,
-                        socket_addr
-                    );
-                    // order client to punch server
-                    self.send_msg(
-                        FromMiddlemanMsg::PunchOrder { remote: socket_addr },
-                        our_socket_n,
-                        host_socket
-                    );
+                    return;
                 }
+
+                if host_socket.ip() == socket_addr.ip() {
+                    // if the host ip and the requesting ip are the same, they are probably
+                    // part of the same network. odds are, they probably can't talk to each other through
+                    // the public network through punching, so let's proxy them through us instead.
+
+                    log::info!("connector and host (rdv_id={:8x}) share same ip {}, start proxy", id, host_socket);
+                    self.start_proxy(id, (our_socket_n, socket_addr), dh_id, false);
+                    return;
+                }
+
+                // answer favorably to the request, without proxy needed
+                self.send_msg(
+                    FromMiddlemanMsg::RequestOk { id, use_proxy: false },
+                    our_socket_n,
+                    socket_addr
+                );
+                log::info!("trying to punch {} <-> {} (id={:x})", host_socket, socket_addr, id);
+                // order server to punch client
+                self.send_msg(
+                    FromMiddlemanMsg::PunchOrder { remote: host_socket },
+                    our_socket_n,
+                    socket_addr
+                );
+                // order client to punch server
+                self.send_msg(
+                    FromMiddlemanMsg::PunchOrder { remote: socket_addr },
+                    our_socket_n,
+                    host_socket
+                );
             },
             ToMiddlemanMsg::Request { id, use_proxy: true, dh_id } => {
                 self.start_proxy(id, (our_socket_n, socket_addr), dh_id, true);
