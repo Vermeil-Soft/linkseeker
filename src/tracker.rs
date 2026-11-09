@@ -10,6 +10,14 @@ const REGISTER_EXPIRE_TIME: Duration = Duration::from_secs(60); // 60 seconds
 const PROXY_EXPIRE_TIME: Duration = Duration::from_secs(60); // 60 seconds
 const PUNCH_CHECK_EXPIRE_TIME: Duration = Duration::from_secs(60); // 60 seconds
 const UDP_SOCKET_N: usize = 2;
+/// Don't proxy packets too soon after the proxy is created:
+/// if router's DmZ is active, if we send a packet *before* they send one,
+/// the packet will go through DmZ instead of the remote, and the remote will be invalid
+/// if we wait a bit before sending packets, we ensure that the DmZ does not catch our packet
+const PROXY_DELAY_BEFORE_FIRST_PACKET: Duration = Duration::from_millis(250);
+/// Packets received during `PROXY_DELAY_BEFORE_FIRST_PACKET` are held back (up to this amount)
+/// and sent once the delay is over, instead of being dropped (e.g. the first rudp Syn).
+const PROXY_MAX_PENDING_PACKETS: usize = 16;
 
 pub struct RdvRemote {
     pub socket_addr: SocketAddr,
@@ -35,6 +43,8 @@ pub struct ProxyData {
     pub out_packets: u64,
     pub last_active: Instant,
     pub first_active: Instant,
+    /// (packet, came from `incoming`) received before the proxy delay was over
+    pub pending: Vec<(Box<[u8]>, bool)>,
 }
 
 impl ProxyData {
@@ -48,6 +58,32 @@ impl ProxyData {
             out_packets: 0,
             last_active: now,
             first_active: now,
+            pending: Vec::new(),
+        }
+    }
+
+    fn is_delay_over(&self, now: Instant) -> bool {
+        now >= self.first_active + PROXY_DELAY_BEFORE_FIRST_PACKET
+    }
+
+    /// Send a packet to the other side of the proxy
+    fn forward(&mut self, udp_sockets: &[UdpSocket; UDP_SOCKET_N], bytes: &[u8], from_incoming: bool) {
+        if from_incoming {
+            self.in_packets += 1;
+            let _r = udp_sockets[self.socket_n].send_to(bytes, self.outgoing);
+        } else {
+            self.out_packets += 1;
+            let _r = udp_sockets[self.socket_n].send_to(bytes, self.incoming);
+        }
+    }
+
+    /// Send the held back packets if the delay is over
+    fn flush_pending(&mut self, udp_sockets: &[UdpSocket; UDP_SOCKET_N], now: Instant) {
+        if self.pending.is_empty() || !self.is_delay_over(now) {
+            return;
+        }
+        for (bytes, from_incoming) in std::mem::take(&mut self.pending) {
+            self.forward(udp_sockets, &bytes, from_incoming);
         }
     }
 
@@ -128,6 +164,13 @@ impl LinkSeekTracker {
         });
     }
 
+    /// Sends the packets that were held back while proxies were too young
+    pub fn flush_pending_proxies(&mut self) {
+        for proxy_data in &mut self.proxy_list {
+            proxy_data.flush_pending(&self.udp_sockets, self.now);
+        }
+    }
+
     /// Every X minutes, tries to log the current tracker status. Should be called regularly.
     pub fn try_log_status(&mut self) {
         const LOG_INTERVAL: Duration = Duration::from_mins(10);
@@ -166,6 +209,7 @@ impl LinkSeekTracker {
             processed |= self.process(&mut buf);
             processed |= self.process(&mut buf);
             self.cleanup();
+            self.flush_pending_proxies();
             self.try_log_status();
             if !processed {
                 if self.proxy_list.len() > 0 {
@@ -236,7 +280,12 @@ impl LinkSeekTracker {
         let host_addr = host.socket_addr;
         let host_always_proxy = host.always_proxy;
         if self.proxy_list.iter().any(|proxy| proxy.incoming == socket_addr && proxy.outgoing == host_addr) {
-            // already exists
+            // already exists: the client is probably retrying because our answer got lost, so answer again
+            self.send_msg(
+                FromMiddlemanMsg::RequestOk { id: rdv_id, use_proxy: true },
+                socket_n,
+                socket_addr
+            );
             return false;
         }
         // answer favorably to the request
@@ -406,25 +455,19 @@ impl LinkSeekTracker {
             (p.socket_n == socket_n && p.incoming == socket_addr)
         );
         if let Some(found) = found {
-            const DELAY_BEFORE_FIRST_PACKET: Duration = Duration::from_millis(250);
-
             found.last_active = self.now;
+            let from_incoming = found.incoming == socket_addr;
 
-            if self.now < found.first_active + DELAY_BEFORE_FIRST_PACKET {
-                // don't proxy packets too soon
-                // if router's DmZ is active, if we send a packet *before* they send one,
-                // the packet will go through DmZ instead of the remote, and the remote will be invalid
-                // if we wait a bit before sending packets, we ensure that the DmZ does not catch our packet
+            if !found.is_delay_over(self.now) {
+                if found.pending.len() < PROXY_MAX_PENDING_PACKETS {
+                    found.pending.push((Box::from(bytes), from_incoming));
+                }
                 return;
             }
 
-            if found.incoming == socket_addr {
-                found.in_packets += 1;
-                let _r = self.udp_sockets[found.socket_n].send_to(bytes, found.outgoing);
-            } else {
-                found.out_packets += 1;
-                let _r = self.udp_sockets[found.socket_n].send_to(bytes, found.incoming);
-            }
+            // keep the order: held back packets go first
+            found.flush_pending(&self.udp_sockets, self.now);
+            found.forward(&self.udp_sockets, bytes, from_incoming);
         }
     }
 
