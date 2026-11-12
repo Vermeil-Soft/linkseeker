@@ -1,4 +1,4 @@
-use crate::data::{FromMiddlemanMsg, ToMiddlemanMsg};
+use crate::{client::compute_linkseeker_key, data::{FromMiddlemanMsg, ToMiddlemanMsg}};
 
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -28,7 +28,7 @@ const PUNCH_CHECK_MAX: usize = 1 << 16;
 const DEFAULT_LNKSK_DOMAIN: &str = "localhost";
 const DNS_TIMEOUT: Duration = Duration::from_secs(5);
 /// How long a resolved domain is cached
-const DNS_REFRESH_INTERVAL: Duration = Duration::from_mins(10);
+const DNS_REFRESH_INTERVAL: Duration = Duration::from_hours(1);
 /// Retry delay when resolving fails (the previous result keeps being used meanwhile)
 const DNS_RETRY_INTERVAL: Duration = Duration::from_secs(30);
 const CLEANUP_INTERVAL: Duration = Duration::from_secs(1);
@@ -308,7 +308,7 @@ impl DnsCache {
                         }
                     }
                     log::debug!("resolved {} to {:?}", self.domain, ips);
-                    *write(&self.ips) = ips;
+                    *write(&self.ips) = ips_filter_collisions(&self.domain, ips);
                     DNS_REFRESH_INTERVAL
                 },
                 Ok(Err(e)) => {
@@ -323,6 +323,25 @@ impl DnsCache {
             tokio::time::sleep(delay).await;
         }
     }
+}
+
+/// Clients tell linkseekers apart by their key, so IPs sharing a key can't be used: remove all of them
+fn ips_filter_collisions(domain: &str, ips: Vec<IpAddr>) -> Vec<IpAddr> {
+    let mut by_key: HashMap<u8, Vec<IpAddr>> = HashMap::new();
+    for ip in &ips {
+        let key = compute_linkseeker_key(*ip);
+        log::debug!("{} resolved ip {} has linkseeker key {}", domain, ip, key);
+        by_key.entry(key).or_default().push(*ip);
+    }
+    for (key, same_key) in &by_key {
+        if same_key.len() > 1 {
+            let same_key: Vec<String> = same_key.iter().map(|ip| ip.to_string()).collect();
+            log::error!("{} resolved ips {} have the same linkseeker key {}, they will not be sent to clients",
+                domain, same_key.join(" and "), key
+            );
+        }
+    }
+    ips.into_iter().filter(|ip| by_key[&compute_linkseeker_key(*ip)].len() == 1).collect()
 }
 
 /// State shared by all the receiving tasks
@@ -698,5 +717,21 @@ impl LinkSeekTracker {
             Some(Err(e)) => Err(std::io::Error::other(format!("tracker task failed: {}", e))),
             _ => Err(std::io::Error::other("tracker task stopped")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_collisions_are_removed() {
+        let ip = |s: &str| s.parse::<IpAddr>().unwrap();
+        // 10.0.0.1 and 10.0.1.0 both have the key 11
+        let ips = vec![ip("10.0.0.1"), ip("10.0.0.2"), ip("10.0.1.0"), ip("10.0.0.3")];
+        assert_eq!(ips_filter_collisions("test", ips), vec![ip("10.0.0.2"), ip("10.0.0.3")]);
+
+        let ips = vec![ip("10.0.0.1"), ip("10.0.1.0"), ip("10.1.0.0")];
+        assert!(ips_filter_collisions("test", ips).is_empty());
     }
 }
