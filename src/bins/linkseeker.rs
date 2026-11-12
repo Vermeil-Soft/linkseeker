@@ -12,8 +12,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         linkseeker::client::DEFAULT_LINKSEEKER_PORT
     };
-    
+
     let mut tracker = LinkSeekTracker::new(start_port)?;
-    tracker.run();
+    tracker.run()?;
     Ok(())
 }

@@ -7,10 +7,12 @@ edition = "2021"
 rand = { version = "0.10", optional = true }
 env_logger = { version = "0.11", optional = true }
 log = { version = "0.4", optional = true }
+tokio = { version = "1.54", optional = true, features = ["rt-multi-thread", "net", "time", "sync"] }
+socket2 = { version = "0.6", optional = true, features = ["all"] }
 
 [features]
 default = []
-tracker = ["rand", "env_logger", "log"]
+tracker = ["rand", "env_logger", "log", "tokio", "socket2"]
 
 [[bin]]
 name = "linkseeker"
